@@ -7,8 +7,9 @@ To run in a multi-gpu environment, use the distributed launcher::
 
 """
 import datetime
-import os
+from pathlib import Path
 import time
+from typing import Callable
 
 import torch
 import torch.utils.data
@@ -17,34 +18,73 @@ import torchvision
 import torchvision.models.detection
 import torchvision.models.detection.mask_rcnn
 
-from .coco_utils import get_coco, get_coco_kp
-
-from .group_by_aspect_ratio import GroupedBatchSampler, create_aspect_ratio_groups
+from .group_by_aspect_ratio import \
+    GroupedBatchSampler, create_aspect_ratio_groups
 from .engine import train_one_epoch, evaluate
 
 from .import utils
 from . import transforms as T
+from .dataset import Dataset
+from ..data_utils import TRAIN_ROOT, load_train_valid_df
 
 
-def get_dataset(name, image_set, transform, data_path):
-    paths = {
-        'coco': (data_path, get_coco, 91),
-        'coco_kp': (data_path, get_coco_kp, 2)
-    }
-    p, ds_fn, num_classes = paths[name]
-
-    ds = ds_fn(p, image_set=image_set, transforms=transform)
-    return ds, num_classes
-
-
-def get_transform(train):
+def get_transform(train: bool) -> Callable:
     transforms = [T.ToTensor()]
-    if train:
-        transforms.append(T.RandomHorizontalFlip(0.5))
     return T.Compose(transforms)
 
 
-def run(args):
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    arg = parser.add_argument
+
+    arg('--model', default='maskrcnn_resnet50_fpn', help='model')
+    arg('--device', default='cuda', help='device')
+    arg('--batch-size', default=2, type=int)
+    arg('--epochs', default=13, type=int, metavar='N',
+        help='number of total epochs to run')
+    arg('--workers', default=4, type=int, metavar='N',
+        help='number of data loading workers (default: 16)')
+    arg('--lr', default=0.02, type=float, help='initial learning rate')
+    arg('--momentum', default=0.9, type=float, metavar='M',
+        help='momentum')
+    arg('--wd', '--weight-decay', default=1e-4, type=float,
+        metavar='W', help='weight decay (default: 1e-4)',
+        dest='weight_decay')
+    arg('--lr-step-size', default=8, type=int,
+        help='decrease lr every step-size epochs')
+    arg('--lr-steps', default=[8, 11], nargs='+', type=int,
+        help='decrease lr every step-size epochs')
+    arg('--lr-gamma', default=0.1, type=float,
+        help='decrease lr by a factor of lr-gamma')
+    arg('--print-freq', default=20, type=int, help='print frequency')
+    arg('--output-dir', default='.', help='path where to save')
+    arg('--resume', default='', help='resume from checkpoint')
+    arg('--aspect-ratio-group-factor', default=0, type=int)
+    arg('--test-only',
+        dest='test_only',
+        help='Only test the model',
+        action='store_true')
+    arg('--pretrained',
+        dest='pretrained',
+        help='Use pre-trained models from the modelzoo',
+        action='store_true')
+
+    # fold parameters
+    arg('--fold', type=int, default=0)
+    arg('--n-folds', type=int, default=5)
+
+    # distributed training parameters
+    arg('--world-size', default=1, type=int,
+        help='number of distributed processes')
+    arg('--dist-url', default='env://',
+        help='url used to set up distributed training')
+
+    args = parser.parse_args()
+
+    if args.output_dir:
+        Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+
     utils.init_distributed_mode(args)
     print(args)
 
@@ -53,10 +93,9 @@ def run(args):
     # Data loading code
     print('Loading data')
 
-    dataset, num_classes = get_dataset(
-        args.dataset, 'train', get_transform(train=True), args.data_path)
-    dataset_test, _ = get_dataset(
-        args.dataset, 'val', get_transform(train=False), args.data_path)
+    df_train, df_valid = load_train_valid_df(args.fold, args.n_folds)
+    dataset = Dataset(df_train, get_transform(train=True), TRAIN_ROOT)
+    dataset_test = Dataset(df_valid, get_transform(train=False), TRAIN_ROOT)
 
     print('Creating data loaders')
     if args.distributed:
@@ -87,7 +126,7 @@ def run(args):
 
     print('Creating model')
     model = torchvision.models.detection.__dict__[args.model](
-        num_classes=num_classes, pretrained=args.pretrained)
+        num_classes=2, pretrained=args.pretrained)
     model.to(device)
 
     model_without_ddp = model
@@ -130,7 +169,7 @@ def run(args):
                 'optimizer': optimizer.state_dict(),
                 'lr_scheduler': lr_scheduler.state_dict(),
                 'args': args},
-                os.path.join(args.output_dir, 'model_{}.pth'.format(epoch)))
+                Path(args.output_dir) / f'model_{epoch}.pth')
 
         # evaluate after every epoch
         evaluate(model, data_loader_test, device=device)
@@ -138,58 +177,6 @@ def run(args):
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print('Training time {}'.format(total_time_str))
-
-
-def main():
-    import argparse
-    parser = argparse.ArgumentParser(description=__doc__)
-    arg = parser.add_argument
-    arg('--data-path', default='/datasets01/COCO/022719/', help='dataset')
-    arg('--dataset', default='coco', help='dataset')
-    arg('--model', default='maskrcnn_resnet50_fpn', help='model')
-    arg('--device', default='cuda', help='device')
-    arg('-b', '--batch-size', default=2, type=int)
-    arg('--epochs', default=13, type=int, metavar='N',
-        help='number of total epochs to run')
-    arg('-j', '--workers', default=4, type=int, metavar='N',
-        help='number of data loading workers (default: 16)')
-    arg('--lr', default=0.02, type=float, help='initial learning rate')
-    arg('--momentum', default=0.9, type=float, metavar='M',
-        help='momentum')
-    arg('--wd', '--weight-decay', default=1e-4, type=float,
-        metavar='W', help='weight decay (default: 1e-4)',
-        dest='weight_decay')
-    arg('--lr-step-size', default=8, type=int,
-        help='decrease lr every step-size epochs')
-    arg('--lr-steps', default=[8, 11], nargs='+', type=int,
-        help='decrease lr every step-size epochs')
-    arg('--lr-gamma', default=0.1, type=float,
-        help='decrease lr by a factor of lr-gamma')
-    arg('--print-freq', default=20, type=int, help='print frequency')
-    arg('--output-dir', default='.', help='path where to save')
-    arg('--resume', default='', help='resume from checkpoint')
-    arg('--aspect-ratio-group-factor', default=0, type=int)
-    arg('--test-only',
-        dest='test_only',
-        help='Only test the model',
-        action='store_true')
-    arg('--pretrained',
-        dest='pretrained',
-        help='Use pre-trained models from the modelzoo',
-        action='store_true')
-
-    # distributed training parameters
-    arg('--world-size', default=1, type=int,
-        help='number of distributed processes')
-    arg('--dist-url', default='env://',
-        help='url used to set up distributed training')
-
-    args = parser.parse_args()
-
-    if args.output_dir:
-        utils.mkdir(args.output_dir)
-
-    run(args)
 
 
 if __name__ == '__main__':

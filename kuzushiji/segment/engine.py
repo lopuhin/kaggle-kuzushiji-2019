@@ -5,8 +5,8 @@ import torch
 
 import torchvision.models.detection.mask_rcnn
 
-from .coco_utils import get_coco_api_from_dataset
-from .coco_eval import CocoEvaluator
+# from .coco_utils import get_coco_api_from_dataset
+# from .coco_eval import CocoEvaluator
 from . import utils
 
 
@@ -78,9 +78,9 @@ def evaluate(model, data_loader, device):
     metric_logger = utils.MetricLogger(delimiter='  ')
     header = 'Test:'
 
-    coco = get_coco_api_from_dataset(data_loader.dataset)
+    # coco = get_coco_api_from_dataset(data_loader.dataset)
     iou_types = _get_iou_types(model)
-    coco_evaluator = CocoEvaluator(coco, iou_types)
+    # coco_evaluator = CocoEvaluator(coco, iou_types)
 
     for image, targets in metric_logger.log_every(data_loader, 100, header):
         image = list(img.to(device) for img in image)
