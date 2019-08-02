@@ -19,6 +19,7 @@ class Dataset(torch.utils.data.Dataset):
         item = self.df.iloc[idx]
         image_path = self.root / f'{item.image_id}.jpg'
         image = Image.open(image_path).convert('RGB')
+        # TODO crop and resize, use albumentations
         if self.transform is not None:
             image = self.transform(image)
         return image

@@ -16,7 +16,6 @@ import torch.utils.data
 from torch import nn
 import torchvision
 import torchvision.models.detection
-import torchvision.models.detection.mask_rcnn
 
 from .group_by_aspect_ratio import \
     GroupedBatchSampler, create_aspect_ratio_groups
@@ -38,7 +37,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     arg = parser.add_argument
 
-    arg('--model', default='maskrcnn_resnet50_fpn', help='model')
+    arg('--model', default='faserrcnn_resnet50_fpn', help='model')
     arg('--device', default='cuda', help='device')
     arg('--batch-size', default=2, type=int)
     arg('--epochs', default=13, type=int, metavar='N',
@@ -65,7 +64,7 @@ def main():
         dest='test_only',
         help='Only test the model',
         action='store_true')
-    arg('--pretrained',
+    arg('--pretrained',  # TODO true by default
         dest='pretrained',
         help='Use pre-trained models from the modelzoo',
         action='store_true')
@@ -125,6 +124,8 @@ def main():
         collate_fn=utils.collate_fn)
 
     print('Creating model')
+    # TODO custom rpn_anchor_generator
+    # TODO also higher box_detections_per_img for inference
     model = torchvision.models.detection.__dict__[args.model](
         num_classes=2, pretrained=args.pretrained)
     model.to(device)
