@@ -22,14 +22,8 @@ from .group_by_aspect_ratio import \
 from .engine import train_one_epoch, evaluate
 
 from .import utils
-from . import transforms as T
-from .dataset import Dataset
+from .dataset import Dataset, get_transform
 from ..data_utils import TRAIN_ROOT, load_train_valid_df
-
-
-def get_transform(train: bool) -> Callable:
-    transforms = [T.ToTensor()]
-    return T.Compose(transforms)
 
 
 def main():
