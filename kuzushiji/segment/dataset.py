@@ -48,9 +48,15 @@ class Dataset(torch.utils.data.Dataset):
             labels = np.array(item.labels.split(' ')).reshape(-1, 5)
         else:
             labels = np.zeros((0, 5))
+        bboxes = labels[:, 1:].astype(np.float)
+        # clip bboxes
+        bboxes[:, 2] = (np.minimum(bboxes[:, 0] + bboxes[:, 2], image.width)
+                        - bboxes[:, 0])
+        bboxes[:, 3] = (np.minimum(bboxes[:, 1] + bboxes[:, 3], image.height)
+                        - bboxes[:, 1])
         xy = {
             'image': np.array(image),
-            'bboxes': labels[:, 1:].astype(np.float),
+            'bboxes': bboxes,
             'labels': np.ones(labels.shape[0], dtype=np.int64),
         }
         xy = self.transform(**xy)
