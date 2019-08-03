@@ -9,13 +9,12 @@ To run in a multi-gpu environment, use the distributed launcher::
 import datetime
 from pathlib import Path
 import time
-from typing import Callable
 
 import torch
 import torch.utils.data
 from torch import nn
-import torchvision
 import torchvision.models.detection
+from torchvision.models.detection.rpn import AnchorGenerator
 
 from .group_by_aspect_ratio import \
     GroupedBatchSampler, create_aspect_ratio_groups
@@ -44,8 +43,6 @@ def main():
     arg('--wd', '--weight-decay', default=1e-4, type=float,
         metavar='W', help='weight decay (default: 1e-4)',
         dest='weight_decay')
-    arg('--lr-step-size', default=8, type=int,
-        help='decrease lr every step-size epochs')
     arg('--lr-steps', default=[8, 11], nargs='+', type=int,
         help='decrease lr every step-size epochs')
     arg('--lr-gamma', default=0.1, type=float,
@@ -118,10 +115,15 @@ def main():
         collate_fn=utils.collate_fn)
 
     print('Creating model')
-    # TODO custom rpn_anchor_generator
-    # TODO also higher box_detections_per_img for inference
     model = torchvision.models.detection.__dict__[args.model](
-        num_classes=2, pretrained=args.pretrained)
+        num_classes=2,
+        pretrained=args.pretrained,
+        rpn_anchor_generator=AnchorGenerator(
+            sizes=((16, 32, 64, 128),),
+            aspect_ratios=((0.5, 1.0, 2.0),),
+        ),
+        box_detections_per_img=500,
+    )
     model.to(device)
 
     model_without_ddp = model
@@ -135,8 +137,6 @@ def main():
         params, lr=args.lr, momentum=args.momentum,
         weight_decay=args.weight_decay)
 
-    # lr_scheduler = torch.optim.lr_scheduler.StepLR(
-    #     optimizer, step_size=args.lr_step_size, gamma=args.lr_gamma)
     lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
         optimizer, milestones=args.lr_steps, gamma=args.lr_gamma)
 

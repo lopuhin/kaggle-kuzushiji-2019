@@ -13,7 +13,7 @@ def get_transform(train: bool) -> Callable:
     transforms = [
         A.LongestMaxSize(max_size=2048),  # all pages to have the same size
         A.RandomSizedCrop(  # TODO a different one for train=False
-            min_max_height=(500, 750),
+            min_max_height=(300, 400),
             width=384,
             height=256,
             w2h_ratio=384 / 256,
@@ -44,7 +44,10 @@ class Dataset(torch.utils.data.Dataset):
         item = self.df.iloc[idx]
         image_path = self.root / f'{item.image_id}.jpg'
         image = Image.open(image_path).convert('RGB')
-        labels = np.array(item.labels.split(' ')).reshape(-1, 5)
+        if item.labels:
+            labels = np.array(item.labels.split(' ')).reshape(-1, 5)
+        else:
+            labels = np.zeros((0, 5))
         xy = {
             'image': np.array(image),
             'bboxes': labels[:, 1:].astype(np.float),
