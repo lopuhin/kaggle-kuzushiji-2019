@@ -16,8 +16,6 @@ from torch import nn
 import torchvision.models.detection
 from torchvision.models.detection.rpn import AnchorGenerator
 
-from .group_by_aspect_ratio import \
-    GroupedBatchSampler, create_aspect_ratio_groups
 from .engine import train_one_epoch, evaluate
 
 from .import utils
@@ -50,7 +48,6 @@ def main():
     arg('--print-freq', default=20, type=int, help='print frequency')
     arg('--output-dir', default='.', help='path where to save')
     arg('--resume', default='', help='resume from checkpoint')
-    arg('--aspect-ratio-group-factor', default=0, type=int)
     arg('--test-only',
         dest='test_only',
         help='Only test the model',
@@ -96,14 +93,8 @@ def main():
         train_sampler = torch.utils.data.RandomSampler(dataset)
         test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
-    if args.aspect_ratio_group_factor >= 0:
-        group_ids = create_aspect_ratio_groups(
-            dataset, k=args.aspect_ratio_group_factor)
-        train_batch_sampler = GroupedBatchSampler(
-            train_sampler, group_ids, args.batch_size)
-    else:
-        train_batch_sampler = torch.utils.data.BatchSampler(
-            train_sampler, args.batch_size, drop_last=True)
+    train_batch_sampler = torch.utils.data.BatchSampler(
+        train_sampler, args.batch_size, drop_last=True)
 
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_sampler=train_batch_sampler, num_workers=args.workers,
