@@ -28,7 +28,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     arg = parser.add_argument
 
-    arg('--model', default='faserrcnn_resnet50_fpn', help='model')
+    arg('--model', default='fasterrcnn_resnet50_fpn', help='model')
     arg('--device', default='cuda', help='device')
     arg('--batch-size', default=2, type=int)
     arg('--epochs', default=13, type=int, metavar='N',
