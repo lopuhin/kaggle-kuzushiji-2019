@@ -30,22 +30,22 @@ def main():
 
     arg('--model', default='fasterrcnn_resnet50_fpn', help='model')
     arg('--device', default='cuda', help='device')
-    arg('--batch-size', default=2, type=int)
-    arg('--epochs', default=13, type=int, metavar='N',
+    arg('--batch-size', default=4, type=int)
+    arg('--epochs', default=50, type=int, metavar='N',
         help='number of total epochs to run')
     arg('--workers', default=4, type=int, metavar='N',
         help='number of data loading workers (default: 16)')
-    arg('--lr', default=0.02, type=float, help='initial learning rate')
+    arg('--lr', default=0.04, type=float, help='initial learning rate')
     arg('--momentum', default=0.9, type=float, metavar='M',
         help='momentum')
     arg('--wd', '--weight-decay', default=1e-4, type=float,
         metavar='W', help='weight decay (default: 1e-4)',
         dest='weight_decay')
-    arg('--lr-steps', default=[8, 11], nargs='+', type=int,
+    arg('--lr-steps', default=[40, 46], nargs='+', type=int,
         help='decrease lr every step-size epochs')
     arg('--lr-gamma', default=0.1, type=float,
         help='decrease lr by a factor of lr-gamma')
-    arg('--print-freq', default=20, type=int, help='print frequency')
+    arg('--print-freq', default=100, type=int, help='print frequency')
     arg('--output-dir', default='.', help='path where to save')
     arg('--resume', default='', help='resume from checkpoint')
     arg('--test-only',
