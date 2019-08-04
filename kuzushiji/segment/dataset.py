@@ -1,3 +1,4 @@
+import random
 from pathlib import Path
 from typing import Callable
 
@@ -60,9 +61,14 @@ class Dataset(torch.utils.data.Dataset):
             'labels': np.ones(labels.shape[0], dtype=np.int64),
         }
         xy = self.transform(**xy)
+        if not xy['bboxes']:
+            return self[random.randint(0, len(self.df) - 1)]
         image = xy['image']
+        boxes = torch.tensor(xy['bboxes'])
+        boxes[:, 2] += boxes[:, 0]
+        boxes[:, 3] += boxes[:, 1]
         target = {
-            'boxes': xy['bboxes'],
-            'labels': xy['labels'],
+            'boxes': boxes,
+            'labels': torch.tensor(xy['labels']),
         }
         return image, target

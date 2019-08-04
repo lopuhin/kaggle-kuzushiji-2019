@@ -106,12 +106,13 @@ def main():
         collate_fn=utils.collate_fn)
 
     print('Creating model')
+    anchor_sizes = [8, 16, 32, 64, 128]  # TODO tune
     model = torchvision.models.detection.__dict__[args.model](
         num_classes=2,
         pretrained=args.pretrained,
         rpn_anchor_generator=AnchorGenerator(
-            sizes=((16, 32, 64, 128),),
-            aspect_ratios=((0.5, 1.0, 2.0),),
+            sizes=tuple((s,) for s in anchor_sizes),
+            aspect_ratios=tuple((0.5, 1.0, 2.0) for _ in anchor_sizes),
         ),
         box_detections_per_img=500,
     )
