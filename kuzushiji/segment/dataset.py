@@ -11,16 +11,28 @@ import torch.utils.data
 
 
 def get_transform(train: bool) -> Callable:
-    transforms = [
-        A.LongestMaxSize(max_size=2048),  # all pages to have the same size
-        A.RandomSizedCrop(  # TODO a different one for train=False
-            min_max_height=(300, 400),
-            width=384,
-            height=256,
-            w2h_ratio=384 / 256,
-        ),
-        ToTensor(),
-    ]
+    train_initial_size = 2048
+    crop_min_max_height = (300, 400)
+    crop_width = 384
+    crop_height = 256
+    if train:
+        transforms = [
+            A.LongestMaxSize(max_size=train_initial_size),
+            A.RandomSizedCrop(
+                min_max_height=crop_min_max_height,
+                width=crop_width,
+                height=crop_height,
+                w2h_ratio=crop_width / crop_height,
+            ),
+        ]
+    else:
+        test_size = int(train_initial_size *
+                        crop_height / np.mean(crop_min_max_height))
+        print(f'test size {test_size}')
+        transforms = [
+            A.LongestMaxSize(max_size=test_size),
+        ]
+    transforms.append(ToTensor())
     return A.Compose(
         transforms,
         bbox_params={
@@ -70,5 +82,6 @@ class Dataset(torch.utils.data.Dataset):
         target = {
             'boxes': boxes,
             'labels': torch.tensor(xy['labels']),
+            'idx': torch.tensor(idx),
         }
         return image, target

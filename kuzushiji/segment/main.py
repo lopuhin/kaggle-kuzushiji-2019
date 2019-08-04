@@ -137,6 +137,7 @@ def main():
         model_without_ddp.load_state_dict(checkpoint['model'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
+        print(f'loaded from checkpoint {args.resume}')
 
     if args.test_only:
         evaluate(model, data_loader_test, device=device)
