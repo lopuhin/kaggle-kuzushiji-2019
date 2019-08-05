@@ -78,7 +78,6 @@ def evaluate(model, data_loader, device, output_dir, threshold=0.5):
 
     for images, targets in metric_logger.log_every(data_loader, 100, header):
         images = list(img.to(device) for img in images)
-        print([x.shape for x in images])
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
         torch.cuda.synchronize()
@@ -98,7 +97,6 @@ def evaluate(model, data_loader, device, output_dir, threshold=0.5):
             if output_dir:
                 _save_predictions(image, boxes,
                                   output_dir / f'{item.image_id}.jpg')
-                import IPython; IPython.embed()
 
         evaluator_time = time.time() - evaluator_time
         metric_logger.update(
