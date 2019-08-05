@@ -1,13 +1,14 @@
+from pathlib import Path
 import math
 import sys
 import time
-import torch
 
+from PIL import Image
+import torch
 import torchvision.models.detection.mask_rcnn
 
-# from .coco_utils import get_coco_api_from_dataset
-# from .coco_eval import CocoEvaluator
 from . import utils
+from ..viz import visualize_boxes
 
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
@@ -69,31 +70,36 @@ def _get_iou_types(model):
 
 
 @torch.no_grad()
-def evaluate(model, data_loader, device):
+def evaluate(model, data_loader, device, output_dir, threshold=0.5):
     cpu_device = torch.device('cpu')
     model.eval()
     metric_logger = utils.MetricLogger(delimiter='  ')
     header = 'Test:'
 
-    for image, targets in metric_logger.log_every(data_loader, 100, header):
-        image = list(img.to(device) for img in image)
+    for images, targets in metric_logger.log_every(data_loader, 100, header):
+        images = list(img.to(device) for img in images)
+        print([x.shape for x in images])
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
         torch.cuda.synchronize()
         model_time = time.time()
-        outputs = model(image)
+        outputs = model(images)
 
         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
         model_time = time.time() - model_time
 
-        res = {target['idx'].item(): output
-               for target, output in zip(targets, outputs)}
-        for item_idx, item_res in res.items():
-            boxes = item_res['boxes'][item_res['scores'] >= 0.5]
-            import IPython; IPython.embed()
-        continue
         evaluator_time = time.time()
-        coco_evaluator.update(res)
+        for target, image, output in zip(targets, images, outputs):
+            boxes = output['boxes'][output['scores'] >= threshold].clone()
+            # convert from pytorch detection format
+            boxes[:, 2] -= boxes[:, 0]
+            boxes[:, 3] -= boxes[:, 1]
+            item = data_loader.dataset.df.iloc[target['idx'].item()]
+            if output_dir:
+                _save_predictions(image, boxes,
+                                  output_dir / f'{item.image_id}.jpg')
+                import IPython; IPython.embed()
+
         evaluator_time = time.time() - evaluator_time
         metric_logger.update(
             model_time=model_time, evaluator_time=evaluator_time)
@@ -101,3 +107,14 @@ def evaluate(model, data_loader, device):
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print('Averaged stats:', metric_logger)
+
+
+def _save_predictions(image, boxes, path: Path):
+    image = image.detach().cpu().clone()
+    image_std = [0.229, 0.224, 0.225]
+    image_mean = [0.485, 0.456, 0.406]
+    for i, (mean, std) in enumerate(zip(image_mean, image_std)):
+        image[i] = image[i] * std + mean
+    image = (image * 255).to(torch.uint8)
+    image = visualize_boxes(image, boxes)
+    Image.fromarray(image).save(path)

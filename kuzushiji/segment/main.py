@@ -15,6 +15,7 @@ import torch.utils.data
 from torch import nn
 import torchvision.models.detection
 from torchvision.models.detection.rpn import AnchorGenerator
+from torchvision.models.detection.transform import GeneralizedRCNNTransform
 
 from .engine import train_one_epoch, evaluate
 
@@ -69,8 +70,9 @@ def main():
 
     args = parser.parse_args()
 
-    if args.output_dir:
-        Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+    output_dir = Path(args.output_dir) if args.output_dir else None
+    if output_dir:
+        output_dir.mkdir(parents=True, exist_ok=True)
 
     utils.init_distributed_mode(args)
     print(args)
@@ -106,16 +108,7 @@ def main():
         collate_fn=utils.collate_fn)
 
     print('Creating model')
-    anchor_sizes = [8, 16, 32, 64, 128]  # TODO tune
-    model = torchvision.models.detection.__dict__[args.model](
-        num_classes=2,
-        pretrained=args.pretrained,
-        rpn_anchor_generator=AnchorGenerator(
-            sizes=tuple((s,) for s in anchor_sizes),
-            aspect_ratios=tuple((0.5, 1.0, 2.0) for _ in anchor_sizes),
-        ),
-        box_detections_per_img=500,
-    )
+    model = build_model(args.model, args.pretrained)
     model.to(device)
 
     model_without_ddp = model
@@ -137,10 +130,10 @@ def main():
         model_without_ddp.load_state_dict(checkpoint['model'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
-        print(f'loaded from checkpoint {args.resume}')
+        print(f'Loaded from checkpoint {args.resume}')
 
     if args.test_only:
-        evaluate(model, data_loader_test, device=device)
+        evaluate(model, data_loader_test, device=device, output_dir=output_dir)
         return
 
     print('Start training')
@@ -151,20 +144,49 @@ def main():
         train_one_epoch(model, optimizer, data_loader, device, epoch,
                         args.print_freq)
         lr_scheduler.step()
-        if args.output_dir:
+        if output_dir:
             utils.save_on_master({
                 'model': model_without_ddp.state_dict(),
                 'optimizer': optimizer.state_dict(),
                 'lr_scheduler': lr_scheduler.state_dict(),
                 'args': args},
-                Path(args.output_dir) / f'model_{epoch}.pth')
+                output_dir / f'model_{epoch}.pth')
 
         # evaluate after every epoch
-        evaluate(model, data_loader_test, device=device)
+        evaluate(model, data_loader_test, device=device,
+                 output_dir=None)
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print('Training time {}'.format(total_time_str))
+
+
+def build_model(name: str, pretrained: bool):
+    anchor_sizes = [8, 16, 32, 64, 128]  # TODO tune
+    model = torchvision.models.detection.__dict__[name](
+        num_classes=2,
+        pretrained=pretrained,
+        rpn_anchor_generator=AnchorGenerator(
+            sizes=tuple((s,) for s in anchor_sizes),
+            aspect_ratios=tuple((0.5, 1.0, 2.0) for _ in anchor_sizes),
+        ),
+        box_detections_per_img=500,
+    )
+    model.transform = ModelTransform(
+        image_mean=model.transform.image_mean,
+        image_std=model.transform.image_std,
+    )
+    return model
+
+
+class ModelTransform(GeneralizedRCNNTransform):
+    def __init__(self, image_mean, image_std):
+        nn.Module.__init__(self)
+        self.image_mean = image_mean
+        self.image_std = image_std
+
+    def resize(self, image, target):
+        return image, target
 
 
 if __name__ == '__main__':

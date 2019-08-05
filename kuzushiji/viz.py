@@ -5,10 +5,12 @@ https://www.kaggle.com/anokas/kuzushiji-visualisation
 from functools import lru_cache
 from pathlib import Path
 
+import cv2
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
+import torch
 
-from .utils import DATA_ROOT, UNICODE_MAP
+from .data_utils import DATA_ROOT, UNICODE_MAP
 
 
 @lru_cache()
@@ -61,3 +63,21 @@ def visualize_training_data(image_path: Path, labels: str, fontsize: int = 50):
                                 char_canvas)
     img = img.convert('RGB')  # Remove alpha for saving in jpg format.
     return img
+
+
+BOX_COLOR = (255, 0, 0)
+
+
+def visualize_box(image: np.ndarray, bbox, color=BOX_COLOR, thickness=2):
+    x_min, y_min, w, h = bbox
+    x_min, x_max, y_min, y_max = \
+        int(x_min), int(x_min + w), int(y_min), int(y_min + h)
+    cv2.rectangle(image, (x_min, y_min), (x_max, y_max),
+                  color=color, thickness=thickness)
+
+
+def visualize_boxes(image: torch.Tensor, boxes):
+    image = np.rollaxis(image.numpy(), 0, 3).copy()
+    for idx, bbox in enumerate(boxes):
+        visualize_box(image, bbox)
+    return image

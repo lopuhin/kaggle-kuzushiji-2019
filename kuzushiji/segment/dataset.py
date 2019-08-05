@@ -28,7 +28,7 @@ def get_transform(train: bool) -> Callable:
     else:
         test_size = int(train_initial_size *
                         crop_height / np.mean(crop_min_max_height))
-        print(f'test size {test_size}')
+        print(f'Test image max size {test_size} px')
         transforms = [
             A.LongestMaxSize(max_size=test_size),
         ]
@@ -77,6 +77,7 @@ class Dataset(torch.utils.data.Dataset):
             return self[random.randint(0, len(self.df) - 1)]
         image = xy['image']
         boxes = torch.tensor(xy['bboxes'])
+        # convert to pytorch detection format
         boxes[:, 2] += boxes[:, 0]
         boxes[:, 3] += boxes[:, 1]
         target = {
