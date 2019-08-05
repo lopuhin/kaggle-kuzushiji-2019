@@ -32,12 +32,12 @@ def main():
 
     arg('--model', default='fasterrcnn_resnet50_fpn', help='model')
     arg('--device', default='cuda', help='device')
-    arg('--batch-size', default=4, type=int)
+    arg('--batch-size', default=16, type=int)
     arg('--epochs', default=50, type=int, metavar='N',
         help='number of total epochs to run')
     arg('--workers', default=4, type=int, metavar='N',
         help='number of data loading workers (default: 16)')
-    arg('--lr', default=0.04, type=float, help='initial learning rate')
+    arg('--lr', default=0.16, type=float, help='initial learning rate')
     arg('--momentum', default=0.9, type=float, metavar='M',
         help='momentum')
     arg('--wd', '--weight-decay', default=1e-4, type=float,
