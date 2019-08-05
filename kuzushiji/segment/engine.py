@@ -4,11 +4,13 @@ import sys
 import time
 
 from PIL import Image
+import numpy as np
 import torch
 import torchvision.models.detection.mask_rcnn
 
 from . import utils
 from ..viz import visualize_boxes
+from ..metric import score_boxes, get_f1
 
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
@@ -75,6 +77,7 @@ def evaluate(model, data_loader, device, output_dir, threshold=0.5):
     model.eval()
     metric_logger = utils.MetricLogger(delimiter='  ')
     header = 'Test:'
+    results = []
 
     for images, targets in metric_logger.log_every(data_loader, 100, header):
         images = list(img.to(device) for img in images)
@@ -93,6 +96,14 @@ def evaluate(model, data_loader, device, output_dir, threshold=0.5):
             # convert from pytorch detection format
             boxes[:, 2] -= boxes[:, 0]
             boxes[:, 3] -= boxes[:, 1]
+            results.append(score_boxes(
+                truth_boxes=target['boxes'].cpu().numpy(),
+                truth_label=np.ones(target['boxes'].shape[0]),
+                preds_center=torch.stack(
+                    [boxes[:, 0] + boxes[:, 2] * 0.5,
+                     boxes[:, 1] + boxes[:, 3] * 0.5]).t().numpy(),
+                preds_label=np.ones(boxes.shape[0]),
+            ))
             item = data_loader.dataset.df.iloc[target['idx'].item()]
             if output_dir:
                 _save_predictions(image, boxes,
@@ -102,9 +113,12 @@ def evaluate(model, data_loader, device, output_dir, threshold=0.5):
         metric_logger.update(
             model_time=model_time, evaluator_time=evaluator_time)
 
-    # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print('Averaged stats:', metric_logger)
+
+    f1 = get_f1(results)  # TODO per book
+    print(f'F1: {f1:.4}')
+    return f1
 
 
 def _save_predictions(image, boxes, path: Path):

@@ -29,9 +29,7 @@ def score_page(preds, truth):
     Returns:
         True/false positive and false negative counts for the page
     """
-    tp = 0
-    fp = 0
-    fn = 0
+    tp = fp = fn = 0
 
     truth_indices = {
         'label': 0,
@@ -80,8 +78,22 @@ def score_page(preds, truth):
         np.array(preds[preds_indices['X']::len(preds_indices)]).astype(float)
     preds_y = \
         np.array(preds[preds_indices['Y']::len(preds_indices)]).astype(float)
-    preds_unused = np.ones(len(preds_label)).astype(bool)
 
+    return score_boxes(
+        truth_boxes=np.stack(
+            [truth_xmin, truth_ymin, truth_ymax, truth_ymax]).T,
+        truth_label=truth_label,
+        preds_center=np.stack([preds_x, preds_y]),
+        preds_label=preds_label,
+    )
+
+
+def score_boxes(truth_boxes, truth_label, preds_center, preds_label):
+    tp = fp = fn = 0
+    preds_x = preds_center[:, 0]
+    preds_y = preds_center[:, 1]
+    truth_xmin, truth_ymin, truth_xmax, truth_ymax = truth_boxes.T
+    preds_unused = np.ones(len(preds_label)).astype(bool)
     for xmin, xmax, ymin, ymax, label in zip(
             truth_xmin, truth_xmax, truth_ymin, truth_ymax, truth_label):
         # Matching = point inside box & character same &
@@ -116,6 +128,10 @@ def kuzushiji_f1(sub, solution):
     pool.close()
     pool.join()
 
+    return get_f1(results)
+
+
+def get_f1(results):
     tp = sum([x['tp'] for x in results])
     fp = sum([x['fp'] for x in results])
     fn = sum([x['fn'] for x in results])

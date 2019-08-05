@@ -47,7 +47,7 @@ def main():
     arg('--lr-gamma', default=0.1, type=float,
         help='decrease lr by a factor of lr-gamma')
     arg('--print-freq', default=100, type=int, help='print frequency')
-    arg('--output-dir', default='.', help='path where to save')
+    arg('--output-dir', help='path where to save')
     arg('--resume', default='', help='resume from checkpoint')
     arg('--test-only',
         dest='test_only',
