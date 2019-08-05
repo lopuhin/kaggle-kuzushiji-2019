@@ -10,6 +10,7 @@ import datetime
 from pathlib import Path
 import time
 
+import json_log_plots
 import torch
 import torch.utils.data
 from torch import nn
@@ -140,10 +141,11 @@ def main():
     for epoch in range(args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
-        train_one_epoch(model, optimizer, data_loader, device, epoch,
-                        args.print_freq)
+        train_metrics = train_one_epoch(
+            model, optimizer, data_loader, device, epoch, args.print_freq)
         lr_scheduler.step()
         if output_dir:
+            json_log_plots.write_event(output_dir, step=epoch, **train_metrics)
             utils.save_on_master({
                 'model': model_without_ddp.state_dict(),
                 'optimizer': optimizer.state_dict(),
@@ -152,8 +154,11 @@ def main():
                 output_dir / f'model_{epoch}.pth')
 
         # evaluate after every epoch
-        evaluate(model, data_loader_test, device=device,
-                 output_dir=None, threshold=args.threshold)
+        valid_metrics = evaluate(
+            model, data_loader_test, device=device, output_dir=None,
+            threshold=args.threshold)
+        if output_dir:
+            json_log_plots.write_event(output_dir, step=epoch, **valid_metrics)
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))

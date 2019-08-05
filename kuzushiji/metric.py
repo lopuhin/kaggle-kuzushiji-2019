@@ -128,10 +128,10 @@ def kuzushiji_f1(sub, solution):
     pool.close()
     pool.join()
 
-    return get_f1(results)
+    return get_metrics(results)['f1']
 
 
-def get_f1(results):
+def get_metrics(results):
     tp = sum([x['tp'] for x in results])
     fp = sum([x['fp'] for x in results])
     fn = sum([x['fn'] for x in results])
@@ -144,7 +144,7 @@ def get_f1(results):
         f1 = (2 * precision * recall) / (precision + recall)
     else:
         f1 = 0
-    return f1
+    return {'f1': f1, 'tp': tp, 'fp': fp, 'fn': fn}
 
 
 def main():

@@ -10,7 +10,7 @@ import torchvision.models.detection.mask_rcnn
 
 from . import utils
 from ..viz import visualize_boxes
-from ..metric import score_boxes, get_f1
+from ..metric import score_boxes, get_metrics
 
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
@@ -57,6 +57,8 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
 
         metric_logger.update(loss=losses_reduced, **loss_dict_reduced)
         metric_logger.update(lr=optimizer.param_groups[0]['lr'])
+
+    return {k: m.global_avg for k, m in metric_logger.meters.items()}
 
 
 def _get_iou_types(model):
@@ -116,9 +118,14 @@ def evaluate(model, data_loader, device, output_dir, threshold):
     metric_logger.synchronize_between_processes()
     print('Averaged stats:', metric_logger)
 
-    f1 = get_f1(results)  # TODO per book
-    print(f'F1: {f1:.4}')
-    return f1
+    metrics = get_metrics(results)  # TODO per book
+    for k, v in metrics.items():
+        if isinstance(v, float):
+            print(f'{k}: {v:.4f}')
+        else:
+            print(f'{k}: {v}')
+
+    return metrics
 
 
 def _save_predictions(image, boxes, path: Path):
