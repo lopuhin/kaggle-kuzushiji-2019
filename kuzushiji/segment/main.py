@@ -50,13 +50,11 @@ def main():
     arg('--output-dir', help='path where to save')
     arg('--resume', default='', help='resume from checkpoint')
     arg('--test-only',
-        dest='test_only',
         help='Only test the model',
         action='store_true')
     arg('--pretrained',  # TODO true by default
-        dest='pretrained',
-        help='Use pre-trained models from the modelzoo',
-        action='store_true')
+        help='Use pre-trained models from the modelzoo', action='store_true')
+    arg('--threshold', type=float, default=0.5)
 
     # fold parameters
     arg('--fold', type=int, default=0)
@@ -133,7 +131,8 @@ def main():
         print(f'Loaded from checkpoint {args.resume}')
 
     if args.test_only:
-        evaluate(model, data_loader_test, device=device, output_dir=output_dir)
+        evaluate(model, data_loader_test, device=device, output_dir=output_dir,
+                 threshold=args.threshold)
         return
 
     print('Start training')
@@ -154,7 +153,7 @@ def main():
 
         # evaluate after every epoch
         evaluate(model, data_loader_test, device=device,
-                 output_dir=None)
+                 output_dir=None, threshold=args.threshold)
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))

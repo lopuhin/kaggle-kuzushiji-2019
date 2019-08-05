@@ -72,7 +72,7 @@ def _get_iou_types(model):
 
 
 @torch.no_grad()
-def evaluate(model, data_loader, device, output_dir, threshold=0.5):
+def evaluate(model, data_loader, device, output_dir, threshold):
     cpu_device = torch.device('cpu')
     model.eval()
     metric_logger = utils.MetricLogger(delimiter='  ')
