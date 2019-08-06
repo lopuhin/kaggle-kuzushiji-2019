@@ -11,6 +11,7 @@ from pathlib import Path
 import time
 
 import json_log_plots
+import pandas as pd
 import torch
 import torch.utils.data
 from torch import nn
@@ -133,9 +134,15 @@ def main():
         lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
         print(f'Loaded from checkpoint {args.resume}')
 
+    def save_eval_results(er):
+        if output_dir:
+            pd.DataFrame(er).to_csv(output_dir / 'eval.csv', index=None)
+
     if args.test_only:
-        evaluate(model, data_loader_test, device=device, output_dir=output_dir,
-                 threshold=args.threshold)
+        _, eval_results = evaluate(
+            model, data_loader_test, device=device, output_dir=output_dir,
+            threshold=args.threshold)
+        save_eval_results(eval_results)
         return
 
     print('Start training')
@@ -156,11 +163,12 @@ def main():
                 output_dir / f'model_{epoch}.pth')
 
         # evaluate after every epoch
-        valid_metrics = evaluate(
+        eval_metrics, eval_results = evaluate(
             model, data_loader_test, device=device, output_dir=None,
             threshold=args.threshold)
+        save_eval_results(eval_results)
         if output_dir:
-            json_log_plots.write_event(output_dir, step=epoch, **valid_metrics)
+            json_log_plots.write_event(output_dir, step=epoch, **eval_metrics)
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))

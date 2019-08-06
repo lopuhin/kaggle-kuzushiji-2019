@@ -94,19 +94,20 @@ def evaluate(model, data_loader, device, output_dir, threshold):
 
         evaluator_time = time.time()
         for target, image, output in zip(targets, images, outputs):
+            item = data_loader.dataset.df.iloc[target['idx'].item()]
             boxes = output['boxes'][output['scores'] >= threshold].clone()
             # convert from pytorch detection format
             boxes[:, 2] -= boxes[:, 0]
             boxes[:, 3] -= boxes[:, 1]
-            results.append(score_boxes(
-                truth_boxes=target['boxes'].cpu().numpy(),
-                truth_label=np.ones(target['boxes'].shape[0]),
-                preds_center=torch.stack(
-                    [boxes[:, 0] + boxes[:, 2] * 0.5,
-                     boxes[:, 1] + boxes[:, 3] * 0.5]).t().numpy(),
-                preds_label=np.ones(boxes.shape[0]),
-            ))
-            item = data_loader.dataset.df.iloc[target['idx'].item()]
+            results.append(
+                dict(score_boxes(
+                    truth_boxes=target['boxes'].cpu().numpy(),
+                    truth_label=np.ones(target['boxes'].shape[0]),
+                    preds_center=torch.stack(
+                        [boxes[:, 0] + boxes[:, 2] * 0.5,
+                         boxes[:, 1] + boxes[:, 3] * 0.5]).t().numpy(),
+                    preds_label=np.ones(boxes.shape[0]),
+                ), image_id=item.image_id))
             if output_dir:
                 _save_predictions(image, boxes,
                                   output_dir / f'{item.image_id}.jpg')
@@ -118,14 +119,14 @@ def evaluate(model, data_loader, device, output_dir, threshold):
     metric_logger.synchronize_between_processes()
     print('Averaged stats:', metric_logger)
 
-    metrics = get_metrics(results)  # TODO per book
+    metrics = get_metrics(results)
     for k, v in metrics.items():
         if isinstance(v, float):
             print(f'{k}: {v:.4f}')
         else:
             print(f'{k}: {v}')
 
-    return metrics
+    return metrics, results
 
 
 def _save_predictions(image, boxes, path: Path):
