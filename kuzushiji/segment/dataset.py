@@ -45,10 +45,12 @@ def get_transform(train: bool) -> Callable:
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, df: pd.DataFrame, transform: Callable, root: Path):
+    def __init__(self, df: pd.DataFrame, transform: Callable, root: Path,
+                 skip_empty: bool):
         self.df = df
         self.root = root
         self.transform = transform
+        self.skip_empty = skip_empty
 
     def __len__(self):
         return len(self.df)
@@ -73,10 +75,10 @@ class Dataset(torch.utils.data.Dataset):
             'labels': np.ones(labels.shape[0], dtype=np.int64),
         }
         xy = self.transform(**xy)
-        if not xy['bboxes']:
+        if not xy['bboxes'] and self.skip_empty:
             return self[random.randint(0, len(self.df) - 1)]
         image = xy['image']
-        boxes = torch.tensor(xy['bboxes'])
+        boxes = torch.tensor(xy['bboxes']).reshape((len(xy['bboxes']), 4))
         # convert to pytorch detection format
         boxes[:, 2] += boxes[:, 0]
         boxes[:, 3] += boxes[:, 1]

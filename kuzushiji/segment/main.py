@@ -37,7 +37,7 @@ def main():
         help='number of total epochs to run')
     arg('--workers', default=4, type=int, metavar='N',
         help='number of data loading workers (default: 16)')
-    arg('--lr', default=0.16, type=float, help='initial learning rate')
+    arg('--lr', default=0.02, type=float, help='initial learning rate')
     arg('--momentum', default=0.9, type=float, metavar='M',
         help='momentum')
     arg('--wd', '--weight-decay', default=1e-4, type=float,
@@ -82,8 +82,10 @@ def main():
     print('Loading data')
 
     df_train, df_valid = load_train_valid_df(args.fold, args.n_folds)
-    dataset = Dataset(df_train, get_transform(train=True), TRAIN_ROOT)
-    dataset_test = Dataset(df_valid, get_transform(train=False), TRAIN_ROOT)
+    dataset = Dataset(
+        df_train, get_transform(train=True), TRAIN_ROOT, skip_empty=True)
+    dataset_test = Dataset(
+        df_valid, get_transform(train=False), TRAIN_ROOT, skip_empty=False)
 
     print('Creating data loaders')
     if args.distributed:
