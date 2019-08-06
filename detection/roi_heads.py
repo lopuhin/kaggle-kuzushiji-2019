@@ -402,8 +402,13 @@ class RoIHeads(torch.nn.Module):
 
             clamped_matched_idxs_in_image = matched_idxs_in_image.clamp(min=0)
 
-            labels_in_image = gt_labels_in_image[clamped_matched_idxs_in_image]
-            labels_in_image = labels_in_image.to(dtype=torch.int64)
+            if gt_labels_in_image.shape[0] == 0:
+                labels_in_image = torch.empty_like(
+                    clamped_matched_idxs_in_image
+                ).fill_(self.proposal_matcher.BELOW_LOW_THRESHOLD)
+            else:
+                labels_in_image = gt_labels_in_image[clamped_matched_idxs_in_image]
+                labels_in_image = labels_in_image.to(dtype=torch.int64)
 
             # Label background (below the low threshold)
             bg_inds = matched_idxs_in_image == self.proposal_matcher.BELOW_LOW_THRESHOLD
@@ -461,7 +466,10 @@ class RoIHeads(torch.nn.Module):
             proposals[img_id] = proposals[img_id][img_sampled_inds]
             labels[img_id] = labels[img_id][img_sampled_inds]
             matched_idxs[img_id] = matched_idxs[img_id][img_sampled_inds]
-            matched_gt_boxes.append(gt_boxes[img_id][matched_idxs[img_id]])
+            if gt_boxes[img_id].shape[0]:
+                matched_gt_boxes.append(gt_boxes[img_id][matched_idxs[img_id]])
+            else:
+                matched_gt_boxes.append([])
 
         regression_targets = self.box_coder.encode(matched_gt_boxes, proposals)
         return proposals, matched_idxs, labels, regression_targets

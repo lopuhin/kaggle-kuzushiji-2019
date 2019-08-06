@@ -135,11 +135,14 @@ class BoxCoder(object):
         self.bbox_xform_clip = bbox_xform_clip
 
     def encode(self, reference_boxes, proposals):
-        boxes_per_image = [len(b) for b in reference_boxes]
-        reference_boxes = torch.cat(reference_boxes, dim=0)
-        proposals = torch.cat(proposals, dim=0)
-        targets = self.encode_single(reference_boxes, proposals)
-        return targets.split(boxes_per_image, 0)
+        encoded = []
+        for _reference_boxes, _proposals in zip(reference_boxes, proposals):
+            if len(_reference_boxes) == 0:
+                targets = torch.zeros_like(_proposals)
+            else:
+                targets = self.encode_single(_reference_boxes, _proposals)
+            encoded.append(targets)
+        return encoded
 
     def encode_single(self, reference_boxes, proposals):
         """
@@ -263,11 +266,12 @@ class Matcher(object):
             be matched.
         """
         if match_quality_matrix.numel() == 0:
-            # empty targets or proposals not supported during training
             if match_quality_matrix.shape[0] == 0:
-                raise ValueError(
-                    "No ground-truth boxes available for one of the images "
-                    "during training")
+                return torch.empty(
+                    match_quality_matrix.shape[1],
+                    dtype=torch.long,
+                    device=match_quality_matrix.device,
+                ).fill_(Matcher.BELOW_LOW_THRESHOLD)
             else:
                 raise ValueError(
                     "No proposal boxes available for one of the images "

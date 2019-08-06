@@ -72,7 +72,7 @@ class Dataset(torch.utils.data.Dataset):
         xy = {
             'image': np.array(image),
             'bboxes': bboxes,
-            'labels': np.ones(labels.shape[0], dtype=np.int64),
+            'labels': np.ones(labels.shape[0], dtype=np.long),
         }
         xy = self.transform(**xy)
         if not xy['bboxes'] and self.skip_empty:
@@ -84,7 +84,7 @@ class Dataset(torch.utils.data.Dataset):
         boxes[:, 3] += boxes[:, 1]
         target = {
             'boxes': boxes,
-            'labels': torch.tensor(xy['labels']),
+            'labels': torch.tensor(xy['labels'], dtype=torch.long),
             'idx': torch.tensor(idx),
         }
         return image, target

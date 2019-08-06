@@ -277,7 +277,10 @@ class RegionProposalNetwork(torch.nn.Module):
             # NB: need to clamp the indices because we can have a single
             # GT in the image, and matched_idxs can be -2, which goes
             # out of bounds
-            matched_gt_boxes_per_image = gt_boxes[matched_idxs.clamp(min=0)]
+            if gt_boxes.shape[0] == 0:
+                matched_gt_boxes_per_image = gt_boxes
+            else:
+                matched_gt_boxes_per_image = gt_boxes[matched_idxs.clamp(min=0)]
 
             labels_per_image = matched_idxs >= 0
             labels_per_image = labels_per_image.to(dtype=torch.float32)
