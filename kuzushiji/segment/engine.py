@@ -6,7 +6,6 @@ import time
 from PIL import Image
 import numpy as np
 import torch
-import torchvision.models.detection.mask_rcnn
 
 from . import utils
 from ..viz import visualize_boxes

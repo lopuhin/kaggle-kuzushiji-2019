@@ -15,9 +15,9 @@ import pandas as pd
 import torch
 import torch.utils.data
 from torch import nn
-import torchvision.models.detection
-from torchvision.models.detection.rpn import AnchorGenerator
-from torchvision.models.detection.transform import GeneralizedRCNNTransform
+import detection
+from detection.rpn import AnchorGenerator
+from detection.transform import GeneralizedRCNNTransform
 
 from .engine import train_one_epoch, evaluate
 
@@ -84,7 +84,7 @@ def main():
 
     df_train, df_valid = load_train_valid_df(args.fold, args.n_folds)
     dataset = Dataset(
-        df_train, get_transform(train=True), TRAIN_ROOT, skip_empty=True)
+        df_train, get_transform(train=True), TRAIN_ROOT, skip_empty=False)
     dataset_test = Dataset(
         df_valid, get_transform(train=False), TRAIN_ROOT, skip_empty=False)
 
@@ -177,7 +177,7 @@ def main():
 
 def build_model(name: str, pretrained: bool):
     anchor_sizes = [8, 16, 32, 64, 128]  # TODO tune
-    model = torchvision.models.detection.__dict__[name](
+    model = detection.__dict__[name](
         num_classes=2,
         pretrained=pretrained,
         rpn_anchor_generator=AnchorGenerator(
