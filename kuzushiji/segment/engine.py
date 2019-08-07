@@ -60,18 +60,6 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     return {k: m.global_avg for k, m in metric_logger.meters.items()}
 
 
-def _get_iou_types(model):
-    model_without_ddp = model
-    if isinstance(model, torch.nn.parallel.DistributedDataParallel):
-        model_without_ddp = model.module
-    iou_types = ['bbox']
-    if isinstance(model_without_ddp, torchvision.models.detection.MaskRCNN):
-        iou_types.append('segm')
-    if isinstance(model_without_ddp, torchvision.models.detection.KeypointRCNN):
-        iou_types.append('keypoints')
-    return iou_types
-
-
 @torch.no_grad()
 def evaluate(model, data_loader, device, output_dir, threshold):
     cpu_device = torch.device('cpu')
