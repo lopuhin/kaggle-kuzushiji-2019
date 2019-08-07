@@ -76,8 +76,8 @@ def visualize_box(image: np.ndarray, bbox, color=BOX_COLOR, thickness=2):
                   color=color, thickness=thickness)
 
 
-def visualize_boxes(image: torch.Tensor, boxes):
-    image = np.rollaxis(image.numpy(), 0, 3).copy()
+def visualize_boxes(image: np.ndarray, boxes, **kwargs):
+    image = image.copy()
     for idx, bbox in enumerate(boxes):
-        visualize_box(image, bbox)
+        visualize_box(image, bbox, **kwargs)
     return image

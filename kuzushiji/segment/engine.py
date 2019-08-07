@@ -82,10 +82,8 @@ def evaluate(model, data_loader, device, output_dir, threshold):
         evaluator_time = time.time()
         for target, image, output in zip(targets, images, outputs):
             item = data_loader.dataset.df.iloc[target['idx'].item()]
-            boxes = output['boxes'][output['scores'] >= threshold].clone()
-            # convert from pytorch detection format
-            boxes[:, 2] -= boxes[:, 0]
-            boxes[:, 3] -= boxes[:, 1]
+            boxes = output['boxes'][output['scores'] >= threshold]
+            boxes = _to_coco(boxes)
             results.append(
                 dict(score_boxes(
                     truth_boxes=target['boxes'].cpu().numpy(),
@@ -96,8 +94,9 @@ def evaluate(model, data_loader, device, output_dir, threshold):
                     preds_label=np.ones(boxes.shape[0]),
                 ), image_id=item.image_id))
             if output_dir:
-                _save_predictions(image, boxes,
-                                  output_dir / f'{item.image_id}.jpg')
+                _save_predictions(
+                    image, boxes, _to_coco(target['boxes']),
+                    path=output_dir / f'{item.image_id}.jpg')
 
         evaluator_time = time.time() - evaluator_time
         metric_logger.update(
@@ -116,7 +115,18 @@ def evaluate(model, data_loader, device, output_dir, threshold):
     return metrics, results
 
 
-def _save_predictions(image, boxes, path: Path):
+def _to_coco(boxes):
+    """ Convert from pytorch detection format to COCO format.
+    """
+    boxes = boxes.clone()
+    boxes[:, 2] -= boxes[:, 0]
+    boxes[:, 3] -= boxes[:, 1]
+    return boxes
+
+
+def _save_predictions(image, boxes, target, path: Path):
     image = (image.detach().cpu() * 255).to(torch.uint8)
-    image = visualize_boxes(image, boxes)
+    image = np.rollaxis(image.numpy(), 0, 3)
+    image = visualize_boxes(image, boxes, thickness=3)
+    image = visualize_boxes(image, target, color=(0, 255, 0), thickness=2)
     Image.fromarray(image).save(path)
