@@ -56,7 +56,8 @@ def main():
         action='store_true')
     arg('--pretrained',  # TODO true by default
         help='Use pre-trained models from the modelzoo', action='store_true')
-    arg('--threshold', type=float, default=0.5)
+    arg('--score-threshold', type=float, default=0.5)
+    arg('--nms-threshold', type=float, default=0.5)
 
     # fold parameters
     arg('--fold', type=int, default=0)
@@ -110,7 +111,7 @@ def main():
         collate_fn=utils.collate_fn)
 
     print('Creating model')
-    model = build_model(args.model, args.pretrained)
+    model = build_model(args.model, args.pretrained, args.nms_threshold)
     model.to(device)
 
     model_without_ddp = model
@@ -141,7 +142,7 @@ def main():
     if args.test_only:
         _, eval_results = evaluate(
             model, data_loader_test, device=device, output_dir=output_dir,
-            threshold=args.threshold)
+            threshold=args.score_threshold)
         save_eval_results(eval_results)
         return
 
@@ -165,7 +166,7 @@ def main():
         # evaluate after every epoch
         eval_metrics, eval_results = evaluate(
             model, data_loader_test, device=device, output_dir=None,
-            threshold=args.threshold)
+            threshold=args.score_threshold)
         save_eval_results(eval_results)
         if output_dir:
             json_log_plots.write_event(output_dir, step=epoch, **eval_metrics)
@@ -175,7 +176,7 @@ def main():
     print('Training time {}'.format(total_time_str))
 
 
-def build_model(name: str, pretrained: bool):
+def build_model(name: str, pretrained: bool, nms_threshold: float):
     anchor_sizes = [8, 16, 32, 64, 128]  # TODO tune
     model = detection.__dict__[name](
         num_classes=2,
@@ -185,6 +186,7 @@ def build_model(name: str, pretrained: bool):
             aspect_ratios=tuple((0.5, 1.0, 2.0) for _ in anchor_sizes),
         ),
         box_detections_per_img=500,
+        box_nms_thresh=nms_threshold,
     )
     model.transform = ModelTransform(
         image_mean=model.transform.image_mean,
