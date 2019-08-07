@@ -117,11 +117,6 @@ def evaluate(model, data_loader, device, output_dir, threshold):
 
 
 def _save_predictions(image, boxes, path: Path):
-    image = image.detach().cpu().clone()
-    image_std = [0.229, 0.224, 0.225]
-    image_mean = [0.485, 0.456, 0.406]
-    for i, (mean, std) in enumerate(zip(image_mean, image_std)):
-        image[i] = image[i] * std + mean
-    image = (image * 255).to(torch.uint8)
+    image = (image.detach().cpu() * 255).to(torch.uint8)
     image = visualize_boxes(image, boxes)
     Image.fromarray(image).save(path)
