@@ -34,8 +34,6 @@ def main():
     arg('--model', default='fasterrcnn_resnet50_fpn', help='model')
     arg('--device', default='cuda', help='device')
     arg('--batch-size', default=16, type=int)
-    arg('--epochs', default=50, type=int, metavar='N',
-        help='number of total epochs to run')
     arg('--workers', default=4, type=int, metavar='N',
         help='number of data loading workers (default: 16)')
     arg('--lr', default=0.02, type=float, help='initial learning rate')
@@ -44,7 +42,9 @@ def main():
     arg('--wd', '--weight-decay', default=1e-4, type=float,
         metavar='W', help='weight decay (default: 1e-4)',
         dest='weight_decay')
-    arg('--lr-steps', default=[40, 46], nargs='+', type=int,
+    arg('--epochs', default=30, type=int, metavar='N',
+        help='number of total epochs to run')
+    arg('--lr-steps', default=[24, 28], nargs='+', type=int,
         help='decrease lr every step-size epochs')
     arg('--lr-gamma', default=0.1, type=float,
         help='decrease lr by a factor of lr-gamma')
