@@ -18,6 +18,7 @@ from torch import nn
 import detection
 from detection.rpn import AnchorGenerator
 from detection.transform import GeneralizedRCNNTransform
+from detection.faster_rcnn import FastRCNNPredictor
 
 from .engine import train_one_epoch, evaluate
 
@@ -179,7 +180,6 @@ def main():
 def build_model(name: str, pretrained: bool, nms_threshold: float):
     anchor_sizes = [12, 24, 32, 64, 96]
     model = detection.__dict__[name](
-        num_classes=2,
         pretrained=pretrained,
         rpn_anchor_generator=AnchorGenerator(
             sizes=tuple((s,) for s in anchor_sizes),
@@ -188,6 +188,9 @@ def build_model(name: str, pretrained: bool, nms_threshold: float):
         box_detections_per_img=500,
         box_nms_thresh=nms_threshold,
     )
+    model.roi_heads.box_predictor = FastRCNNPredictor(
+        in_channels=model.roi_heads.box_predictor.cls_score.in_features,
+        num_classes=2)
     model.transform = ModelTransform(
         image_mean=model.transform.image_mean,
         image_std=model.transform.image_std,
