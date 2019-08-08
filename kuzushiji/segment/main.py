@@ -55,10 +55,11 @@ def main():
     arg('--test-only',
         help='Only test the model',
         action='store_true')
-    arg('--pretrained',  # TODO true by default
-        help='Use pre-trained models from the modelzoo', action='store_true')
+    arg('--pretrained', type=int, default=1,
+        help='Use pre-trained models from the modelzoo')
     arg('--score-threshold', type=float, default=0.5)
     arg('--nms-threshold', type=float, default=0.5)
+    arg('--repeat-train-step', type=int, default=2)
 
     # fold parameters
     arg('--fold', type=int, default=0)
@@ -152,8 +153,9 @@ def main():
     for epoch in range(args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
-        train_metrics = train_one_epoch(
-            model, optimizer, data_loader, device, epoch, args.print_freq)
+        for _ in range(args.repeat_train_step):
+            train_metrics = train_one_epoch(
+                model, optimizer, data_loader, device, epoch, args.print_freq)
         lr_scheduler.step()
         if output_dir:
             json_log_plots.write_event(output_dir, step=epoch, **train_metrics)
