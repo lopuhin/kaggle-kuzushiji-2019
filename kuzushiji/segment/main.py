@@ -36,7 +36,7 @@ def main():
     arg('--batch-size', default=16, type=int)
     arg('--workers', default=4, type=int, metavar='N',
         help='number of data loading workers (default: 16)')
-    arg('--lr', default=0.02, type=float, help='initial learning rate')
+    arg('--lr', default=0.01, type=float, help='initial learning rate')
     arg('--momentum', default=0.9, type=float, metavar='M',
         help='momentum')
     arg('--wd', '--weight-decay', default=1e-4, type=float,
