@@ -12,9 +12,9 @@ import torch.utils.data
 
 def get_transform(train: bool) -> Callable:
     train_initial_size = 2048
-    crop_min_max_height = (300, 400)
-    crop_width = 384
-    crop_height = 256
+    crop_min_max_height = (400, 533)
+    crop_width = 512
+    crop_height = 384
     if train:
         transforms = [
             A.LongestMaxSize(max_size=train_initial_size),
@@ -24,6 +24,13 @@ def get_transform(train: bool) -> Callable:
                 height=crop_height,
                 w2h_ratio=crop_width / crop_height,
             ),
+           #A.HueSaturationValue(
+           #    hue_shift_limit=7,
+           #    sat_shift_limit=30,
+           #    val_shift_limit=30,
+           #),
+           #A.RandomBrightnessContrast(),
+           #A.RandomGamma(),
         ]
     else:
         test_size = int(train_initial_size *
@@ -32,7 +39,9 @@ def get_transform(train: bool) -> Callable:
         transforms = [
             A.LongestMaxSize(max_size=test_size),
         ]
-    transforms.append(ToTensor())
+    transforms.extend([
+        ToTensor(),
+    ])
     return A.Compose(
         transforms,
         bbox_params={
