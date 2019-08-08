@@ -8,6 +8,7 @@ import numpy as np
 import torch
 
 from . import utils
+from ..data_utils import to_coco
 from ..viz import visualize_boxes
 from ..metric import score_boxes, get_metrics
 
@@ -83,7 +84,7 @@ def evaluate(model, data_loader, device, output_dir, threshold):
         for target, image, output in zip(targets, images, outputs):
             item = data_loader.dataset.df.iloc[target['idx'].item()]
             boxes = output['boxes'][output['scores'] >= threshold]
-            boxes = _to_coco(boxes)
+            boxes = to_coco(boxes)
             results.append(
                 dict(score_boxes(
                     truth_boxes=target['boxes'].cpu().numpy(),
@@ -95,7 +96,7 @@ def evaluate(model, data_loader, device, output_dir, threshold):
                 ), image_id=item.image_id))
             if output_dir:
                 _save_predictions(
-                    image, boxes, _to_coco(target['boxes']),
+                    image, boxes, to_coco(target['boxes']),
                     path=output_dir / f'{item.image_id}.jpg')
 
         evaluator_time = time.time() - evaluator_time
@@ -113,15 +114,6 @@ def evaluate(model, data_loader, device, output_dir, threshold):
             print(f'{k}: {v}')
 
     return metrics, results
-
-
-def _to_coco(boxes):
-    """ Convert from pytorch detection format to COCO format.
-    """
-    boxes = boxes.clone()
-    boxes[:, 2] -= boxes[:, 0]
-    boxes[:, 3] -= boxes[:, 1]
-    return boxes
 
 
 def _save_predictions(image, boxes, target, path: Path):

@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 import numpy as np
+import torch
 
 
 DATA_ROOT = Path(__file__).parent.parent / 'data'
@@ -41,3 +42,12 @@ def _get_book_id(image_id):
         return m.group()
     else:
         return book_id
+
+
+def to_coco(boxes: torch.Tensor) -> torch.Tensor:
+    """ Convert from pytorch detection format to COCO format.
+    """
+    boxes = boxes.clone()
+    boxes[:, 2] -= boxes[:, 0]
+    boxes[:, 3] -= boxes[:, 1]
+    return boxes
