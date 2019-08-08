@@ -177,7 +177,7 @@ def main():
 
 
 def build_model(name: str, pretrained: bool, nms_threshold: float):
-    anchor_sizes = [8, 16, 32, 64, 128]  # TODO tune
+    anchor_sizes = [12, 24, 32, 64, 96]
     model = detection.__dict__[name](
         num_classes=2,
         pretrained=pretrained,
