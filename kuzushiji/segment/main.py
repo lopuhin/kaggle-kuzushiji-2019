@@ -6,6 +6,7 @@ To run in a multi-gpu environment, use the distributed launcher::
         main.py ... --world-size $NGPU
 
 """
+import argparse
 import datetime
 from pathlib import Path
 import time
@@ -28,22 +29,19 @@ from ..data_utils import TRAIN_ROOT, load_train_valid_df
 
 
 def main():
-    import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     arg = parser.add_argument
 
     arg('--model', default='fasterrcnn_resnet50_fpn', help='model')
     arg('--device', default='cuda', help='device')
     arg('--batch-size', default=16, type=int)
-    arg('--workers', default=4, type=int, metavar='N',
+    arg('--workers', default=4, type=int,
         help='number of data loading workers (default: 16)')
     arg('--lr', default=0.01, type=float, help='initial learning rate')
-    arg('--momentum', default=0.9, type=float, metavar='M',
-        help='momentum')
+    arg('--momentum', default=0.9, type=float, help='momentum')
     arg('--wd', '--weight-decay', default=1e-4, type=float,
-        metavar='W', help='weight decay (default: 1e-4)',
-        dest='weight_decay')
-    arg('--epochs', default=30, type=int, metavar='N',
+        help='weight decay (default: 1e-4)', dest='weight_decay')
+    arg('--epochs', default=30, type=int,
         help='number of total epochs to run')
     arg('--lr-steps', default=[24, 28], nargs='+', type=int,
         help='decrease lr every step-size epochs')
@@ -52,9 +50,7 @@ def main():
     arg('--print-freq', default=100, type=int, help='print frequency')
     arg('--output-dir', help='path where to save')
     arg('--resume', default='', help='resume from checkpoint')
-    arg('--test-only',
-        help='Only test the model',
-        action='store_true')
+    arg('--test-only', help='Only test the model', action='store_true')
     arg('--pretrained', type=int, default=1,
         help='Use pre-trained models from the modelzoo')
     arg('--score-threshold', type=float, default=0.5)
