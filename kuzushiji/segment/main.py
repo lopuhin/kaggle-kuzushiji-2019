@@ -58,7 +58,7 @@ def main():
     arg('--pretrained', type=int, default=1,
         help='Use pre-trained models from the modelzoo')
     arg('--score-threshold', type=float, default=0.5)
-    arg('--nms-threshold', type=float, default=0.5)
+    arg('--nms-threshold', type=float, default=0.25)
     arg('--repeat-train-step', type=int, default=2)
 
     # fold parameters
