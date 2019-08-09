@@ -2,18 +2,17 @@ import argparse
 from pathlib import Path
 
 import torch
-from torch import nn
 from torch.utils.data import DataLoader
 
 from ..data_utils import TRAIN_ROOT, load_train_valid_df
 from .dataset import Dataset, get_transform, get_encoded_classes
+from .models import build_model
 
 
 def main():
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
 
-    arg('--model', default='fasterrcnn_resnet50_fpn', help='model')
     arg('--device', default='cuda', help='device')
     arg('--batch-size', default=16, type=int)
     arg('--workers', default=4, type=int,
@@ -58,21 +57,9 @@ def main():
         num_workers=args.workers)
 
     print('Creating model')
-    model = build_model(args.model)
+    model = build_model(n_classes=len(classes))
     device = torch.device(args.device)
     model.to(device)
-
-
-def build_model(name: str) -> nn.Module:
-    pass
-
-
-class Model(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, x):
-        return x
 
 
 if __name__ == '__main__':
