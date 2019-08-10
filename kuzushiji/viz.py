@@ -28,7 +28,9 @@ def load_font(fontsize: int):
         size=fontsize, encoding='utf-8')
 
 
-def visualize_training_data(image_path: Path, labels: str, fontsize: int = 50):
+def visualize_training_data(
+        image_path: Path, labels: str, fontsize: int = 50,
+        with_labels: bool = True):
     """ This function takes in a filename of an image,
     and the labels in the string format given in train.csv,
     and returns an image containing the bounding boxes
@@ -55,9 +57,10 @@ def visualize_training_data(image_path: Path, labels: str, fontsize: int = 50):
 
         # Draw bounding box around character, and unicode character next to it
         bbox_draw.rectangle((x, y, x+w, y+h), fill=(255, 255, 255, 0),
-                            outline=(255, 0, 0, 255))
-        char_draw.text((x + w + fontsize/4, y + h/2 - fontsize), char,
-                       fill=(0, 0, 255, 255), font=font)
+                            outline=(255, 0, 0, 255), width=4)
+        if with_labels:
+            char_draw.text((x + w + fontsize/4, y + h/2 - fontsize), char,
+                           fill=(0, 0, 255, 255), font=font)
 
     img = Image.alpha_composite(Image.alpha_composite(img, bbox_canvas),
                                 char_canvas)
