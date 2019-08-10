@@ -51,10 +51,17 @@ def get_transform(train: bool) -> Callable:
         bbox_params={
             'format': 'coco',
             'min_area': 0,
-            'min_visibility': 1.0,
+            'min_visibility': 0.99,
             'label_fields': ['labels'],
         },
     )
+
+
+def collate_fn(batch):
+    images = torch.stack([img for (img, _), _ in batch])
+    boxes = [b for (_, b), _ in batch]
+    labels = torch.cat([l for (_, _), l in batch])
+    return (images, boxes), labels
 
 
 def get_encoded_classes() -> Dict[str, int]:
@@ -105,9 +112,5 @@ class Dataset(torch.utils.data.Dataset):
         # convert to pytorch detection format
         boxes[:, 2] += boxes[:, 0]
         boxes[:, 3] += boxes[:, 1]
-        target = {
-            'boxes': boxes,
-            'labels': torch.tensor(xy['labels'], dtype=torch.long),
-            'idx': torch.tensor(idx),
-        }
-        return image, target
+        labels = torch.tensor(xy['labels'], dtype=torch.long)
+        return (image, boxes), labels

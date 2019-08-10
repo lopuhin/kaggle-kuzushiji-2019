@@ -17,10 +17,11 @@ class Model(nn.Module):
             in_features=self.base.out_features * self.resolution ** 2,
             n_classes=n_classes)
 
-    def forward(self, x, rois):
+    def forward(self, x):
+        x, rois = x
         x = self.base(x)
-        x = roi_align(x, rois, output_size=self.resolution)
-        # TODO flatten or reshape
+        x = roi_align(x, rois, output_size=(self.resolution, self.resolution))
+        x = x.flatten(start_dim=1)
         x = self.head(x)
         return x
 
