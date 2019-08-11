@@ -75,11 +75,11 @@ def get_encoded_classes() -> Dict[str, int]:
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, *, df: pd.DataFrame, transform: Callable, root: Path,
-                 allow_empty: bool, classes: Dict[str, int]):
+                 resample_empty: bool, classes: Dict[str, int]):
         self.df = df
         self.root = root
         self.transform = transform
-        self.allow_empty = allow_empty
+        self.resample_empty = resample_empty
         self.classes = classes
 
     def __len__(self):
@@ -106,8 +106,11 @@ class Dataset(torch.utils.data.Dataset):
             'labels': [self.classes[c] for c in labels[:, 0]],
         }
         xy = self.transform(**xy)
-        if not self.allow_empty:
-            assert len(xy['bboxes']) > 0
+        if len(xy['bboxes']) == 0:
+            if self.resample_empty:
+                return self[random.randint(0, len(self) - 1)]
+            else:
+                raise ValueError('empty bboxes not expected')
         image = xy['image']
         boxes = torch.tensor(xy['bboxes']).reshape((len(xy['bboxes']), 4))
         # convert to pytorch detection format

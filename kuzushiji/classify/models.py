@@ -19,8 +19,15 @@ class Model(nn.Module):
 
     def forward(self, x):
         x, rois = x
+        _, _, input_h, input_w = x.shape
         x = self.base(x)
-        x = roi_align(x, rois, output_size=(self.resolution, self.resolution))
+        _, _, x_h, x_w = x.shape
+        # TODO maybe use multi-scale pooling?
+        x = roi_align(
+            x, rois,
+            output_size=(self.resolution, self.resolution),
+            spatial_scale=x_w / input_w,
+        )
         x = x.flatten(start_dim=1)
         x = self.head(x)
         return x
@@ -45,7 +52,7 @@ class ResNetBase(nn.Module):
     def __init__(self):
         super().__init__()
         self.base = models.resnet50(pretrained=True)
-        self.out_features = self.base.fc.in_features
+        self.out_features = 1024  # with layer3
 
     def forward(self, x):
         base = self.base
@@ -56,5 +63,5 @@ class ResNetBase(nn.Module):
         x = base.layer1(x)
         x = base.layer2(x)
         x = base.layer3(x)
-        x = base.layer4(x)
+        # x = base.layer4(x)
         return x

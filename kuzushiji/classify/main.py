@@ -48,13 +48,13 @@ def main():
         df=df_train,
         transform=get_transform(train=True),
         root=TRAIN_ROOT,
-        allow_empty=True,
+        resample_empty=True,
         classes=classes)
     dataset_test = Dataset(
         df=df_valid,
         transform=get_transform(train=False),
         root=TRAIN_ROOT,
-        allow_empty=False,
+        resample_empty=False,
         classes=classes)
     data_loader = DataLoader(
         dataset,
@@ -92,7 +92,7 @@ def main():
     step = 0
 
     @trainer.on(Events.ITERATION_COMPLETED)
-    def log_training_loss(trainer):
+    def log_training_loss(_):
         nonlocal step
         train_losses.append(trainer.state.output)
         smoothed_loss = np.mean(train_losses)
@@ -105,7 +105,7 @@ def main():
                 loss=smoothed_loss)
 
     @trainer.on(Events.EPOCH_COMPLETED)
-    def log_validation_results(trainer):
+    def log_validation_results(_):
         evaluator.run(data_loader_test)
         metrics = {
             'valid_loss': evaluator.state.metrics['loss'],
