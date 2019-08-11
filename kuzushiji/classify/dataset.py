@@ -68,18 +68,18 @@ def get_encoded_classes() -> Dict[str, int]:
     classes = set()
     df_train = load_train_df()
     for s in df_train['labels'].values:
-         x = s.split()
-         classes.update(x[i] for i in range(0, len(x), 5))
+        x = s.split()
+        classes.update(x[i] for i in range(0, len(x), 5))
     return {cls: i for i, cls in enumerate(sorted(classes))}
 
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, *, df: pd.DataFrame, transform: Callable, root: Path,
-                 skip_empty: bool, classes: Dict[str, int]):
+                 allow_empty: bool, classes: Dict[str, int]):
         self.df = df
         self.root = root
         self.transform = transform
-        self.skip_empty = skip_empty
+        self.allow_empty = allow_empty
         self.classes = classes
 
     def __len__(self):
@@ -106,8 +106,8 @@ class Dataset(torch.utils.data.Dataset):
             'labels': [self.classes[c] for c in labels[:, 0]],
         }
         xy = self.transform(**xy)
-        if not xy['bboxes'] and self.skip_empty:
-            return self[random.randint(0, len(self.df) - 1)]
+        if not self.allow_empty:
+            assert len(xy['bboxes']) > 0
         image = xy['image']
         boxes = torch.tensor(xy['bboxes']).reshape((len(xy['bboxes']), 4))
         # convert to pytorch detection format

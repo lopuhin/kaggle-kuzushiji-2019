@@ -42,18 +42,19 @@ def main():
 
     print('Loading data')
     df_train, df_valid = load_train_valid_df(args.fold, args.n_folds)
+    df_valid = df_valid[df_valid['labels'] != '']
     classes = get_encoded_classes()
     dataset = Dataset(
         df=df_train,
         transform=get_transform(train=True),
         root=TRAIN_ROOT,
-        skip_empty=True,
+        allow_empty=True,
         classes=classes)
     dataset_test = Dataset(
         df=df_valid,
         transform=get_transform(train=False),
         root=TRAIN_ROOT,
-        skip_empty=False,
+        allow_empty=False,
         classes=classes)
     data_loader = DataLoader(
         dataset,
@@ -106,11 +107,14 @@ def main():
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_validation_results(trainer):
         evaluator.run(data_loader_test)
-        metrics = evaluator.state.metrics
-        s = trainer.state.epoch
-        print(f'Validation Results - Epoch: {s.epoch}  '
-              f'Avg accuracy: {metrics["accuracy"]:.4f} '
-              f'Avg loss: {metrics["loss"]:.4f}')
+        metrics = {
+            'valid_loss': evaluator.state.metrics['loss'],
+            'accuracy': evaluator.state.metrics['accuracy'],
+        }
+        if args.output_dir:
+            json_log_plots.write_event(
+                args.output_dir, step=step * args.batch_size, **metrics)
+        epochs_pbar.set_postfix({k: f'{v:.4f}' for k, v in metrics.items()})
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def checkpoint(_):
@@ -122,7 +126,6 @@ def main():
         epochs_pbar.update(1)
         epoch_pbar.reset()
 
-    print('Starting training')
     trainer.run(data_loader, max_epochs=100)
 
 
