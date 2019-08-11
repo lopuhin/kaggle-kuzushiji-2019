@@ -4,8 +4,8 @@ from typing import Callable, Dict
 
 import albumentations as A
 from albumentations.pytorch import ToTensor
+import cv2
 import numpy as np
-from PIL import Image
 import pandas as pd
 import torch.utils.data
 
@@ -87,20 +87,21 @@ class Dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         item = self.df.iloc[idx]
-        image_path = self.root / f'{item.image_id}.jpg'
-        image = Image.open(image_path).convert('RGB')
+        image = cv2.imread(str(self.root / f'{item.image_id}.jpg'))
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         if item.labels:
             labels = np.array(item.labels.split(' ')).reshape(-1, 5)
         else:
             labels = np.zeros((0, 5))
         bboxes = labels[:, 1:].astype(np.float)
         # clip bboxes
-        bboxes[:, 2] = (np.minimum(bboxes[:, 0] + bboxes[:, 2], image.width)
+        height, width, _ = image.shape
+        bboxes[:, 2] = (np.minimum(bboxes[:, 0] + bboxes[:, 2], width)
                         - bboxes[:, 0])
-        bboxes[:, 3] = (np.minimum(bboxes[:, 1] + bboxes[:, 3], image.height)
+        bboxes[:, 3] = (np.minimum(bboxes[:, 1] + bboxes[:, 3], height)
                         - bboxes[:, 1])
         xy = {
-            'image': np.array(image),
+            'image': image,
             'bboxes': bboxes,
             'labels': [self.classes[c] for c in labels[:, 0]],
         }
