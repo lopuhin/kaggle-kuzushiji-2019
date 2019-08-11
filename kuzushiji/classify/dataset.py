@@ -12,7 +12,7 @@ import torch.utils.data
 from ..data_utils import load_train_df
 
 
-def get_transform(train: bool) -> Callable:
+def get_transform(train: bool, normalize: bool = True) -> Callable:
     train_initial_size = 2048  # TODO higher?
     crop_min_max_height = (400, 533)
     # TODO smaller crop, swap height/width
@@ -42,8 +42,9 @@ def get_transform(train: bool) -> Callable:
         transforms = [
             A.LongestMaxSize(max_size=test_size),
         ]
+    if normalize:
+        transforms.append(A.Normalize())
     transforms.extend([
-        A.Normalize(),
         ToTensor(),
     ])
     return A.Compose(
