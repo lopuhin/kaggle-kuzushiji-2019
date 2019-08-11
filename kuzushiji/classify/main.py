@@ -1,6 +1,7 @@
 import argparse
 from collections import deque
 from pathlib import Path
+import pandas as pd
 
 from ignite.engine import (
     Events, create_supervised_evaluator, create_supervised_trainer)
@@ -33,6 +34,7 @@ def main():
     arg('--test-only', help='Only test the model', action='store_true')
     arg('--fold', type=int, default=0)
     arg('--n-folds', type=int, default=5)
+    arg('--repeat-train', type=int, default=4)
     args = parser.parse_args()
     print(args)
 
@@ -45,7 +47,7 @@ def main():
     df_valid = df_valid[df_valid['labels'] != '']
     classes = get_encoded_classes()
     dataset = Dataset(
-        df=df_train,
+        df=pd.concat([df_train] * args.repeat_train),
         transform=get_transform(train=True),
         root=TRAIN_ROOT,
         resample_empty=True,
