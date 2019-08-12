@@ -128,7 +128,7 @@ def main():
         epochs_pbar.update(1)
         epoch_pbar.reset()
 
-    trainer.run(data_loader, max_epochs=100)
+    trainer.run(data_loader, max_epochs=args.epochs)
 
 
 if __name__ == '__main__':
