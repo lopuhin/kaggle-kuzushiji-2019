@@ -24,7 +24,7 @@ def main():
 
     arg('--action', default='train')
     arg('--device', default='cuda', help='device')
-    arg('--batch-size', default=16, type=int)
+    arg('--batch-size', default=12, type=int)
     arg('--workers', default=12, type=int,
         help='number of data loading workers (default: 16)')
     arg('--lr', default=2.5e-5, type=float, help='initial learning rate')
@@ -72,6 +72,7 @@ def main():
 
     print('Creating model')
     model = build_model(n_classes=len(classes))
+    print(model)
     device = torch.device(args.device)
     model.to(device)
 

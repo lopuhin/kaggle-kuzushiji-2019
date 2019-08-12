@@ -13,11 +13,10 @@ from ..data_utils import load_train_df
 
 
 def get_transform(train: bool, normalize: bool = True) -> Callable:
-    train_initial_size = 2048  # TODO higher?
-    crop_min_max_height = (400, 533)
-    # TODO smaller crop, swap height/width
+    train_initial_size = 3072
+    crop_min_max_height = (800, 1066)
     crop_width = 512
-    crop_height = 384
+    crop_height = 768
     if train:
         transforms = [
             A.LongestMaxSize(max_size=train_initial_size),
