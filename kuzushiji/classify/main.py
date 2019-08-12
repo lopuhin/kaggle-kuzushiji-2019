@@ -27,8 +27,8 @@ def main():
     arg('--batch-size', default=16, type=int)
     arg('--workers', default=12, type=int,
         help='number of data loading workers (default: 16)')
-    arg('--lr', default=1e-3, type=float, help='initial learning rate')
-    arg('--epochs', default=50, type=int,
+    arg('--lr', default=2.5e-5, type=float, help='initial learning rate')
+    arg('--epochs', default=30, type=int,
         help='number of total epochs to run')
     arg('--output-dir', help='path where to save', type=Path)
     arg('--test-only', help='Only test the model', action='store_true')
