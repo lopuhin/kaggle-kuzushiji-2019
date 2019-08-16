@@ -53,6 +53,16 @@ def get_transform(train: bool) -> Callable:
     )
 
 
+def get_target_boxes_labels(item):
+    if item.labels:
+        labels = np.array(item.labels.split(' ')).reshape(-1, 5)
+    else:
+        labels = np.zeros((0, 5))
+    boxes = labels[:, 1:].astype(np.float)
+    labels = labels[:, 0]
+    return boxes, labels
+
+
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, df: pd.DataFrame, transform: Callable, root: Path,
                  skip_empty: bool):
@@ -68,12 +78,8 @@ class Dataset(torch.utils.data.Dataset):
         item = self.df.iloc[idx]
         image_path = self.root / f'{item.image_id}.jpg'
         image = Image.open(image_path).convert('RGB')
-        if item.labels:
-            labels = np.array(item.labels.split(' ')).reshape(-1, 5)
-        else:
-            labels = np.zeros((0, 5))
-        bboxes = labels[:, 1:].astype(np.float)
-        # clip bboxes
+        bboxes, labels = get_target_boxes_labels(item)
+        # clip bboxes (else albumentations fails)
         bboxes[:, 2] = (np.minimum(bboxes[:, 0] + bboxes[:, 2], image.width)
                         - bboxes[:, 0])
         bboxes[:, 3] = (np.minimum(bboxes[:, 1] + bboxes[:, 3], image.height)
@@ -81,7 +87,7 @@ class Dataset(torch.utils.data.Dataset):
         xy = {
             'image': np.array(image),
             'bboxes': bboxes,
-            'labels': np.ones(labels.shape[0], dtype=np.long),
+            'labels': np.ones_like(labels, dtype=np.long),
         }
         xy = self.transform(**xy)
         if not xy['bboxes'] and self.skip_empty:

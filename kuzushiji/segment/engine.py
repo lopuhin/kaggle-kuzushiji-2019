@@ -11,6 +11,7 @@ from . import utils
 from ..data_utils import to_coco
 from ..viz import visualize_boxes
 from ..metric import score_boxes, get_metrics
+from .dataset import get_target_boxes_labels
 
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
@@ -67,7 +68,8 @@ def evaluate(model, data_loader, device, output_dir, threshold):
     model.eval()
     metric_logger = utils.MetricLogger(delimiter='  ')
     header = 'Test:'
-    results = []
+    scores = []
+    clf_gt = []
 
     for images, targets in metric_logger.log_every(data_loader, 100, header):
         images = list(img.to(device) for img in images)
@@ -83,20 +85,30 @@ def evaluate(model, data_loader, device, output_dir, threshold):
         evaluator_time = time.time()
         for target, image, output in zip(targets, images, outputs):
             item = data_loader.dataset.df.iloc[target['idx'].item()]
+            del target
+            target_boxes, target_labels = get_target_boxes_labels(item)
             boxes = output['boxes'][output['scores'] >= threshold]
             boxes = to_coco(boxes)
-            results.append(
+            # TODO scale boxes to original scale
+            scores.append(
                 dict(score_boxes(
-                    truth_boxes=target['boxes'].cpu().numpy(),
-                    truth_label=np.ones(target['boxes'].shape[0]),
+                    truth_boxes=target_boxes,
+                    truth_label=np.ones_like(target_labels),
                     preds_center=torch.stack(
                         [boxes[:, 0] + boxes[:, 2] * 0.5,
                          boxes[:, 1] + boxes[:, 3] * 0.5]).t().numpy(),
                     preds_label=np.ones(boxes.shape[0]),
                 ), image_id=item.image_id))
+            clf_gt.append(
+                dict(get_clf_gt(
+                    truth_boxes=target_boxes,
+                    truth_label=target_labels,
+                    pred_boxes=boxes,
+                ), image_id=item.image_id))
             if output_dir:
+                # TODO ensure the same scale for image, boxes and target_boxes
                 _save_predictions(
-                    image, boxes, to_coco(target['boxes']),
+                    image, boxes, to_coco(target_boxes),
                     path=output_dir / f'{item.image_id}.jpg')
 
         evaluator_time = time.time() - evaluator_time
@@ -106,14 +118,14 @@ def evaluate(model, data_loader, device, output_dir, threshold):
     metric_logger.synchronize_between_processes()
     print('Averaged stats:', metric_logger)
 
-    metrics = get_metrics(results)
+    metrics = get_metrics(scores)
     for k, v in metrics.items():
         if isinstance(v, float):
             print(f'{k}: {v:.4f}')
         else:
             print(f'{k}: {v}')
 
-    return metrics, results
+    return metrics, scores
 
 
 def _save_predictions(image, boxes, target, path: Path):
