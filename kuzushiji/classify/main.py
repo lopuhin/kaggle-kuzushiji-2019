@@ -13,7 +13,7 @@ from torch import optim, nn
 from torch.utils.data import DataLoader
 import tqdm
 
-from ..data_utils import TRAIN_ROOT, load_train_valid_df
+from ..data_utils import TRAIN_ROOT, load_train_valid_df, load_train_df
 from .dataset import Dataset, get_transform, get_encoded_classes, collate_fn
 from .models import build_model
 
@@ -22,6 +22,7 @@ def main():
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
 
+    arg('clf_gt', help='segmentation predictions')
     arg('--action', default='train')
     arg('--base', default='resnet50')
     arg('--device', default='cuda', help='device')
@@ -44,7 +45,11 @@ def main():
         output_dir.mkdir(parents=True, exist_ok=True)
 
     print('Loading data')
-    df_train, df_valid = load_train_valid_df(args.fold, args.n_folds)
+    df_train_gt, df_valid_gt = load_train_valid_df(args.fold, args.n_folds)
+    df_clf_gt = pd.read_csv(args.clf_gt)
+    df_train, df_valid = [
+        df_clf_gt[df_clf_gt['image_id'].isin(set(df['image_id']))]
+        for df in [df_train_gt, df_valid_gt]]
     df_valid = df_valid[df_valid['labels'] != '']
     classes = get_encoded_classes()
     dataset = Dataset(
