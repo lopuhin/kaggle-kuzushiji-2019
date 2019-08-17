@@ -134,8 +134,10 @@ def main():
         print(f'Loaded from checkpoint {args.resume}')
 
     def save_eval_results(er):
+        scores, clf_gt = er
         if output_dir:
-            pd.DataFrame(er).to_csv(output_dir / 'eval.csv', index=None)
+            pd.DataFrame(scores).to_csv(output_dir / 'eval.csv', index=None)
+            pd.DataFrame(clf_gt).to_csv(output_dir / 'clf_gt.csv', index=None)
 
     if args.test_only:
         _, eval_results = evaluate(

@@ -64,8 +64,11 @@ def collate_fn(batch):
     return (images, boxes), labels
 
 
+SEG_FP = 'seg_fp'  # false positive from segmentation
+
+
 def get_encoded_classes() -> Dict[str, int]:
-    classes = set()
+    classes = {SEG_FP}
     df_train = load_train_df()
     for s in df_train['labels'].values:
         x = s.split()

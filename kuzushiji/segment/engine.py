@@ -107,12 +107,13 @@ def evaluate(model, data_loader, device, output_dir, threshold):
                     ).t().numpy(),
                     preds_label=np.ones(boxes.shape[0]),
                 ), image_id=item.image_id))
-            clf_gt.append(
-                dict(get_clf_gt(
+            clf_gt.append({
+                'labels': get_clf_gt(
                     target_boxes=target_boxes,
                     target_labels=target_labels,
-                    boxes=scaled_boxes,
-                ), image_id=item.image_id))
+                    boxes=scaled_boxes),
+                'image_id': item.image_id,
+            })
             if output_dir:
                 unscaled_target_boxes = _scaled_boxes(
                     target_boxes, 1 / w_scale, 1 / h_scale)
@@ -134,9 +135,7 @@ def evaluate(model, data_loader, device, output_dir, threshold):
         else:
             print(f'{k}: {v}')
 
-    # TODO handle get_clf_gt
-
-    return metrics, scores
+    return metrics, (scores, clf_gt)
 
 
 def _scaled_boxes(boxes, w_scale, h_scale):
@@ -156,6 +155,10 @@ def _save_predictions(image, boxes, target, path: Path):
     Image.fromarray(image).save(path)
 
 
-def get_clf_gt(target_boxes, target_labels, boxes) -> Dict:
+def get_clf_gt(target_boxes, target_labels, boxes, min_iou=0.5) -> str:
+    """ Create ground truth for classification from predicted boxes
+    in the same format as original ground truth, with addition of a class for
+    false negatives. Perform matching using box IoU.
+    """
     # TODO
-    return {}
+    return ''
