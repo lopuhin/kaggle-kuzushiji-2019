@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import torch.utils.data
 
-from ..data_utils import load_train_df, get_image_path, read_image
+from ..data_utils import load_train_df, get_image_path, read_image, SEG_FP
 
 
 def get_transform(train: bool, normalize: bool = True) -> Callable:
@@ -62,9 +62,6 @@ def collate_fn(batch):
     boxes = [b for (_, b), _ in batch]
     labels = torch.cat([l for (_, _), l in batch])
     return (images, boxes), labels
-
-
-SEG_FP = 'seg_fp'  # false positive from segmentation
 
 
 def get_encoded_classes() -> Dict[str, int]:
