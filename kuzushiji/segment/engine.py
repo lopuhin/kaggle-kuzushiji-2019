@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 from . import utils
-from ..data_utils import to_coco, get_image_path, SEG_FP
+from ..data_utils import to_coco, from_coco, get_image_path, SEG_FP
 from ..viz import visualize_boxes
 from ..metric import score_boxes, get_metrics
 from .dataset import get_target_boxes_labels
@@ -87,6 +87,7 @@ def evaluate(model, data_loader, device, output_dir, threshold):
             item = data_loader.dataset.df.iloc[target['idx'].item()]
             del target
             target_boxes, target_labels = get_target_boxes_labels(item)
+            target_boxes = torch.from_numpy(target_boxes)
             boxes = output['boxes'][output['scores'] >= threshold]
             boxes = to_coco(boxes)
             with Image.open(get_image_path(
@@ -98,26 +99,26 @@ def evaluate(model, data_loader, device, output_dir, threshold):
             scaled_boxes = _scaled_boxes(boxes, w_scale, h_scale)
             scores.append(
                 dict(score_boxes(
-                    truth_boxes=target_boxes,
-                    truth_label=np.ones_like(target_labels),
+                    truth_boxes=from_coco(target_boxes).numpy(),
+                    truth_label=np.ones(target_labels.shape[0]),
                     preds_center=torch.stack(
                         [scaled_boxes[:, 0] + scaled_boxes[:, 2] * 0.5,
                          scaled_boxes[:, 1] + scaled_boxes[:, 3] * 0.5]
                     ).t().numpy(),
                     preds_label=np.ones(boxes.shape[0]),
                 ), image_id=item.image_id))
-            clf_gt.append({
-                'labels': get_clf_gt(
-                    target_boxes=target_boxes,
-                    target_labels=target_labels,
-                    boxes=scaled_boxes),
-                'image_id': item.image_id,
-            })
+           #clf_gt.append({
+           #    'labels': get_clf_gt(
+           #        target_boxes=target_boxes,
+           #        target_labels=target_labels,
+           #        boxes=scaled_boxes),
+           #    'image_id': item.image_id,
+           #})
             if output_dir:
                 unscaled_target_boxes = _scaled_boxes(
                     target_boxes, 1 / w_scale, 1 / h_scale)
                 _save_predictions(
-                    image, boxes, to_coco(unscaled_target_boxes),
+                    image, boxes, unscaled_target_boxes,
                     path=output_dir / f'{item.image_id}.jpg')
 
         evaluator_time = time.time() - evaluator_time
@@ -143,7 +144,7 @@ def _scaled_boxes(boxes, w_scale, h_scale):
         boxes[:, 1] * h_scale,
         boxes[:, 2] * w_scale,
         boxes[:, 3] * h_scale,
-    ])
+    ]).t()
 
 
 def _save_predictions(image, boxes, target, path: Path):

@@ -162,7 +162,7 @@ def main():
                 'optimizer': optimizer.state_dict(),
                 'lr_scheduler': lr_scheduler.state_dict(),
                 'args': args},
-                output_dir / f'model_{epoch}.pth')
+                output_dir / f'model_last.pth')
 
         # evaluate after every epoch
         eval_metrics, eval_results = evaluate(

@@ -65,3 +65,12 @@ def to_coco(boxes: torch.Tensor) -> torch.Tensor:
     boxes[:, 2] -= boxes[:, 0]
     boxes[:, 3] -= boxes[:, 1]
     return boxes
+
+
+def from_coco(boxes: torch.Tensor) -> torch.Tensor:
+    """ Convert from CODO to pytorch detection format.
+    """
+    boxes = boxes.clone()
+    boxes[:, 2] += boxes[:, 0]
+    boxes[:, 3] += boxes[:, 1]
+    return boxes
