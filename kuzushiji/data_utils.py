@@ -17,8 +17,8 @@ UNICODE_MAP = {codepoint: char for codepoint, char in
 SEG_FP = 'seg_fp'  # false positive from segmentation
 
 
-def load_train_df():
-    df = pd.read_csv(DATA_ROOT / 'train.csv')
+def load_train_df(path=DATA_ROOT / 'train.csv'):
+    df = pd.read_csv(path)
     df['labels'].fillna(value='', inplace=True)
     return df
 

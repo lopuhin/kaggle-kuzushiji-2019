@@ -2,10 +2,11 @@ import argparse
 from collections import deque
 from pathlib import Path
 import pandas as pd
+from typing import Dict
 
 from ignite.engine import (
     Events, create_supervised_evaluator, create_supervised_trainer)
-from ignite.metrics import Accuracy, Loss
+from ignite.metrics import Accuracy, Loss, Metric
 import json_log_plots
 import numpy as np
 import torch
@@ -13,9 +14,9 @@ from torch import optim, nn
 from torch.utils.data import DataLoader
 import tqdm
 
-from ..data_utils import TRAIN_ROOT, load_train_valid_df, load_train_df
+from ..data_utils import TRAIN_ROOT, load_train_valid_df, load_train_df, SEG_FP
 from .dataset import Dataset, get_transform, get_encoded_classes, collate_fn
-from .models import build_model
+from .models import build_model, get_output
 
 
 def main():
@@ -46,7 +47,7 @@ def main():
 
     print('Loading data')
     df_train_gt, df_valid_gt = load_train_valid_df(args.fold, args.n_folds)
-    df_clf_gt = pd.read_csv(args.clf_gt)
+    df_clf_gt = load_train_df(args.clf_gt)
     df_train, df_valid = [
         df_clf_gt[df_clf_gt['image_id'].isin(set(df['image_id']))]
         for df in [df_train_gt, df_valid_gt]]
@@ -86,13 +87,17 @@ def main():
     loss = nn.CrossEntropyLoss()
 
     trainer = create_supervised_trainer(
-        model, optimizer, loss, device=device)
+        model, optimizer,
+        loss_fn=lambda x: loss(get_output(x)),
+        device=device,
+    )
     evaluator = create_supervised_evaluator(
         model,
         device=device,
         metrics={
-            'accuracy': Accuracy(),
-            'loss': Loss(loss),
+            'accuracy': Accuracy(output_transform=get_output),
+            'loss': Loss(loss, output_transform=get_output),
+            'predictions': GetPredictions(classes),
         })
 
     epochs_pbar = tqdm.trange(args.epochs)
@@ -120,6 +125,7 @@ def main():
             'valid_loss': evaluator.state.metrics['loss'],
             'accuracy': evaluator.state.metrics['accuracy'],
         }
+        # TODO final F1 metric against df_valid_gt
         if args.output_dir:
             json_log_plots.write_event(
                 args.output_dir, step=step * args.batch_size, **metrics)
@@ -136,6 +142,29 @@ def main():
         epoch_pbar.reset()
 
     trainer.run(data_loader, max_epochs=args.epochs)
+
+
+class GetPredictions(Metric):
+    def __init__(self, classes: Dict[str, int], *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._predictions = []
+        self._classes = {idx: cls for cls, idx in classes.items()}
+
+    def reset(self):
+        self._predictions.clear()
+
+    def update(self, output):
+        (y_pred, boxes), _ = output
+        classes = [self._classes[idx] for idx in y_pred.argmax(dim=1)]
+        centers_x = 0.5 * (boxes[:, 0] + boxes[:, 2])
+        centers_y = 0.5 * (boxes[:, 1] + boxes[:, 3])
+        prediction = [
+            (x, y, cls) for x, y, cls in zip(centers_x, centers_y, classes)
+            if cls != SEG_FP]
+        self._predictions.append(prediction)
+
+    def compute(self):
+        return self._predictions
 
 
 if __name__ == '__main__':

@@ -40,7 +40,12 @@ class Model(nn.Module):
              x_l2.flatten(start_dim=1)],
             dim=1)
         x = self.head(x)
-        return x
+        return x, rois
+
+
+def get_output(x_rois):
+    x, rois = x_rois
+    return x
 
 
 class Head(nn.Module):
