@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import torch.utils.data
 
-from ..data_utils import load_train_df
+from ..data_utils import load_train_df, get_image_path, read_image
 
 
 def get_transform(train: bool, normalize: bool = True) -> Callable:
@@ -87,8 +87,7 @@ class Dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         item = self.df.iloc[idx]
-        image = cv2.imread(str(self.root / f'{item.image_id}.jpg'))
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = read_image(get_image_path(item, self.root))
         if item.labels:
             labels = np.array(item.labels.split(' ')).reshape(-1, 5)
         else:

@@ -1,6 +1,7 @@
 import re
 from pathlib import Path
 
+import cv2
 import pandas as pd
 import numpy as np
 import torch
@@ -33,6 +34,16 @@ def load_train_valid_df(fold: int, n_folds: int):
                       if book_id not in valid_book_ids]
     return tuple(df[df['book_id'].isin(ids)].copy()
                  for ids in [train_book_ids, valid_book_ids])
+
+
+def get_image_path(item, root: Path) -> Path:
+    return root / f'{item.image_id}.jpg'
+
+
+def read_image(path: Path) -> np.ndarray:
+    image = cv2.imread(str(path))
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    return image
 
 
 def _get_book_id(image_id):

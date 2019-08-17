@@ -2,13 +2,14 @@ from pathlib import Path
 import math
 import sys
 import time
+from typing import Dict
 
 from PIL import Image
 import numpy as np
 import torch
 
 from . import utils
-from ..data_utils import to_coco
+from ..data_utils import to_coco, get_image_path
 from ..viz import visualize_boxes
 from ..metric import score_boxes, get_metrics
 from .dataset import get_target_boxes_labels
@@ -89,26 +90,34 @@ def evaluate(model, data_loader, device, output_dir, threshold):
             target_boxes, target_labels = get_target_boxes_labels(item)
             boxes = output['boxes'][output['scores'] >= threshold]
             boxes = to_coco(boxes)
-            # TODO scale boxes to original scale
+            with Image.open(get_image_path(
+                    item, data_loader.dataset.root)) as original_image:
+                ow, oh = original_image.size
+            _, h, w = image.shape
+            w_scale = ow / w
+            h_scale = oh / h
+            scaled_boxes = _scaled_boxes(boxes, w_scale, h_scale)
             scores.append(
                 dict(score_boxes(
                     truth_boxes=target_boxes,
                     truth_label=np.ones_like(target_labels),
                     preds_center=torch.stack(
-                        [boxes[:, 0] + boxes[:, 2] * 0.5,
-                         boxes[:, 1] + boxes[:, 3] * 0.5]).t().numpy(),
+                        [scaled_boxes[:, 0] + scaled_boxes[:, 2] * 0.5,
+                         scaled_boxes[:, 1] + scaled_boxes[:, 3] * 0.5]
+                    ).t().numpy(),
                     preds_label=np.ones(boxes.shape[0]),
                 ), image_id=item.image_id))
             clf_gt.append(
                 dict(get_clf_gt(
-                    truth_boxes=target_boxes,
-                    truth_label=target_labels,
-                    pred_boxes=boxes,
+                    target_boxes=target_boxes,
+                    target_labels=target_labels,
+                    boxes=scaled_boxes,
                 ), image_id=item.image_id))
             if output_dir:
-                # TODO ensure the same scale for image, boxes and target_boxes
+                unscaled_target_boxes = _scaled_boxes(
+                    target_boxes, 1 / w_scale, 1 / h_scale)
                 _save_predictions(
-                    image, boxes, to_coco(target_boxes),
+                    image, boxes, to_coco(unscaled_target_boxes),
                     path=output_dir / f'{item.image_id}.jpg')
 
         evaluator_time = time.time() - evaluator_time
@@ -125,7 +134,18 @@ def evaluate(model, data_loader, device, output_dir, threshold):
         else:
             print(f'{k}: {v}')
 
+    # TODO handle get_clf_gt
+
     return metrics, scores
+
+
+def _scaled_boxes(boxes, w_scale, h_scale):
+    return torch.stack([
+        boxes[:, 0] * w_scale,
+        boxes[:, 1] * h_scale,
+        boxes[:, 2] * w_scale,
+        boxes[:, 3] * h_scale,
+    ])
 
 
 def _save_predictions(image, boxes, target, path: Path):
@@ -134,3 +154,8 @@ def _save_predictions(image, boxes, target, path: Path):
     image = visualize_boxes(image, boxes, thickness=3)
     image = visualize_boxes(image, target, color=(0, 255, 0), thickness=2)
     Image.fromarray(image).save(path)
+
+
+def get_clf_gt(target_boxes, target_labels, boxes) -> Dict:
+    # TODO
+    return {}
