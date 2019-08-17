@@ -5,14 +5,14 @@ from torchvision.ops import roi_align
 from torchvision import models
 
 
-def build_model(n_classes: int) -> nn.Module:
-    return Model(n_classes=n_classes)
+def build_model(base: str, n_classes: int) -> nn.Module:
+    return Model(base=base, n_classes=n_classes)
 
 
 class Model(nn.Module):
-    def __init__(self, n_classes: int):
+    def __init__(self, base: str, n_classes: int):
         super().__init__()
-        self.base = ResNetBase()
+        self.base = ResNetBase(base)
         self.res_l1 = 3
         self.res_l2 = 3
         self.head = Head(
@@ -59,9 +59,9 @@ class Head(nn.Module):
 
 
 class ResNetBase(nn.Module):
-    def __init__(self):
+    def __init__(self, name: str = 'resnet50'):
         super().__init__()
-        self.base = models.resnet50(pretrained=True)
+        self.base = getattr(models, name)(pretrained=True)
         self.out_features_l1 = 512
         self.out_features_l2 = 1024
 

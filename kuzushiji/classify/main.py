@@ -23,6 +23,7 @@ def main():
     arg = parser.add_argument
 
     arg('--action', default='train')
+    arg('--base', default='resnet50')
     arg('--device', default='cuda', help='device')
     arg('--batch-size', default=12, type=int)
     arg('--workers', default=12, type=int,
@@ -71,7 +72,7 @@ def main():
         num_workers=args.workers)
 
     print('Creating model')
-    model = build_model(n_classes=len(classes))
+    model = build_model(base=args.base, n_classes=len(classes))
     print(model)
     device = torch.device(args.device)
     model.to(device)
