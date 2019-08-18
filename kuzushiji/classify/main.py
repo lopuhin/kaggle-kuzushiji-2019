@@ -16,8 +16,8 @@ from torch.utils.data import DataLoader
 import tqdm
 
 from ..data_utils import (
-    DATA_ROOT, TRAIN_ROOT, TEST_ROOT, load_train_valid_df, load_train_df,
-    SEG_FP, from_coco, get_target_boxes_labels, print_metrics)
+    TRAIN_ROOT, TEST_ROOT, load_train_valid_df, load_train_df,
+    SEG_FP, from_coco, get_target_boxes_labels, print_metrics, scaled_boxes)
 from ..metric import score_boxes, get_metrics
 from .dataset import (
     Dataset, get_transform, get_encoded_classes, collate_fn, get_labels)

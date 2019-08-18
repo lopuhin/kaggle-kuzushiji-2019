@@ -9,7 +9,7 @@ import torch
 
 from . import utils
 from ..data_utils import (
-    to_coco, from_coco, get_image_path, SEG_FP, print_metrics)
+    to_coco, from_coco, get_image_path, SEG_FP, print_metrics, scaled_boxes)
 from ..viz import visualize_boxes
 from ..metric import score_boxes, get_metrics
 from .dataset import get_target_boxes_labels
@@ -97,7 +97,7 @@ def evaluate(model, data_loader, device, output_dir, threshold):
             _, h, w = image.shape
             w_scale = ow / w
             h_scale = oh / h
-            scaled_boxes = _scaled_boxes(boxes, w_scale, h_scale)
+            scaled_boxes = scaled_boxes(boxes, w_scale, h_scale)
             scores.append(
                 dict(score_boxes(
                     truth_boxes=from_coco(target_boxes).numpy(),
@@ -116,7 +116,7 @@ def evaluate(model, data_loader, device, output_dir, threshold):
                 'image_id': item.image_id,
             })
             if output_dir:
-                unscaled_target_boxes = _scaled_boxes(
+                unscaled_target_boxes = scaled_boxes(
                     target_boxes, 1 / w_scale, 1 / h_scale)
                 _save_predictions(
                     image, boxes, unscaled_target_boxes,
@@ -132,15 +132,6 @@ def evaluate(model, data_loader, device, output_dir, threshold):
     print_metrics(metrics)
 
     return metrics, (scores, clf_gt)
-
-
-def _scaled_boxes(boxes, w_scale, h_scale):
-    return torch.stack([
-        boxes[:, 0] * w_scale,
-        boxes[:, 1] * h_scale,
-        boxes[:, 2] * w_scale,
-        boxes[:, 3] * h_scale,
-    ]).t()
 
 
 def _save_predictions(image, boxes, target, path: Path):
