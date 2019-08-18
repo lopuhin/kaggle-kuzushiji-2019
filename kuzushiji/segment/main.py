@@ -88,6 +88,7 @@ def main():
     df_train, df_valid = load_train_valid_df(args.fold, args.n_folds)
     if args.submission:
         df_valid = pd.read_csv(DATA_ROOT / 'sample_submission.csv')
+        df_valid['labels'] = ''
         df_valid = df_valid[:10]
     dataset = Dataset(
         df_train, get_transform(train=True), TRAIN_ROOT, skip_empty=False)

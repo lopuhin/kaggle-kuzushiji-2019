@@ -15,6 +15,7 @@ python f1.py --sub_path [submission.csv] --solution_path [groundtruth.csv]
 
 import argparse
 import multiprocessing
+from typing import List, Dict
 
 import numpy as np
 import pandas as pd
@@ -138,19 +139,19 @@ def kuzushiji_f1(sub, solution):
     return get_metrics(results)['f1']
 
 
-def get_metrics(results):
+def get_metrics(results: List[Dict]) -> Dict:
     tp = int(sum([x['tp'] for x in results]))
     fp = int(sum([x['fp'] for x in results]))
     fn = int(sum([x['fn'] for x in results]))
-
     if (tp + fp) == 0 or (tp + fn) == 0:
-        return 0
-    precision = tp / (tp + fp)
-    recall = tp / (tp + fn)
-    if precision > 0 and recall > 0:
-        f1 = (2 * precision * recall) / (precision + recall)
-    else:
         f1 = 0
+    else:
+        precision = tp / (tp + fp)
+        recall = tp / (tp + fn)
+        if precision > 0 and recall > 0:
+            f1 = (2 * precision * recall) / (precision + recall)
+        else:
+            f1 = 0
     return {'f1': float(f1), 'tp': tp, 'fp': fp, 'fn': fn}
 
 
