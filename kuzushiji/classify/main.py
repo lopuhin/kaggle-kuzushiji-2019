@@ -60,7 +60,7 @@ def main():
         df_valid = df_train = df_clf_gt
         empty_index = df_valid['labels'] == ''
         empty_pages = df_valid[empty_index]['image_id'].values
-        df_valid = df_valid[~empty_pages]
+        df_valid = df_valid[~empty_index]
         root = TEST_ROOT
     else:
         df_train, df_valid = [
@@ -190,7 +190,8 @@ def main():
         submission.extend(
             {'image_id': image_id, 'labels': ''} for image_id in empty_pages)
         pd.DataFrame(submission).to_csv(
-            output_dir / f'submission_{output_dir.name}.csv')
+            output_dir / f'submission_{output_dir.name}.csv',
+            index=None)
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_validation_results(_):
