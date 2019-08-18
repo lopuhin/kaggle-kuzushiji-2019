@@ -24,7 +24,7 @@ def main():
     arg = parser.add_argument
 
     arg('clf_gt', help='segmentation predictions')
-    arg('--action', default='train')
+    # arg('--action', default='train')
     arg('--base', default='resnet50')
     arg('--device', default='cuda', help='device')
     arg('--batch-size', default=12, type=int)
@@ -34,7 +34,7 @@ def main():
     arg('--epochs', default=30, type=int,
         help='number of total epochs to run')
     arg('--output-dir', help='path where to save', type=Path)
-    arg('--test-only', help='Only test the model', action='store_true')
+    # arg('--test-only', help='Only test the model', action='store_true')
     arg('--fold', type=int, default=0)
     arg('--n-folds', type=int, default=5)
     arg('--repeat-train', type=int, default=4)
@@ -92,12 +92,17 @@ def main():
         loss_fn=lambda y_pred, y: loss(get_output(y_pred), y),
         device=device,
     )
+
+    def output_transform(output):
+        y_pred, y = output
+        return get_output(y_pred), y
+
     evaluator = create_supervised_evaluator(
         model,
         device=device,
         metrics={
-            'accuracy': Accuracy(output_transform=get_output),
-            'loss': Loss(loss, output_transform=get_output),
+            'accuracy': Accuracy(output_transform=output_transform),
+            'loss': Loss(loss, output_transform=output_transform),
             'predictions': GetPredictions(classes),
         })
 
@@ -114,7 +119,7 @@ def main():
         epoch_pbar.set_postfix(loss=f'{smoothed_loss:.4f}')
         epoch_pbar.update(1)
         step += 1
-        if step % 20 == 0 and args.action == 'train' and args.output_dir:
+        if step % 20 == 0 and args.output_dir:
             json_log_plots.write_event(
                 args.output_dir, step=step * args.batch_size,
                 loss=smoothed_loss)
@@ -155,8 +160,8 @@ class GetPredictions(Metric):
         self._predictions.clear()
 
     def update(self, output):
-        (y_pred, boxes), _ = output
-        classes = [self._classes[idx] for idx in y_pred.argmax(dim=1)]
+        (y_pred, (boxes,)), _ = output
+        classes = [self._classes[int(idx)] for idx in y_pred.argmax(dim=1)]
         centers_x = 0.5 * (boxes[:, 0] + boxes[:, 2])
         centers_y = 0.5 * (boxes[:, 1] + boxes[:, 3])
         prediction = [
