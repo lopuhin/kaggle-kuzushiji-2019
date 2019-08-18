@@ -178,7 +178,7 @@ def get_clf_gt(target_boxes, target_labels, boxes, min_iou=0.5) -> str:
                 label = SEG_FP
             labels.append(label)
     return ' '.join(
-        ' '.join(str(int(round(float(x)))) for x in box) + ' ' + label
+        label + ' ' + ' '.join(str(int(round(float(x)))) for x in box)
         for box, label in zip(boxes, labels))
 
 
