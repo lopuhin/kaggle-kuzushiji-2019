@@ -8,7 +8,8 @@ import numpy as np
 import torch
 
 from . import utils
-from ..data_utils import to_coco, from_coco, get_image_path, SEG_FP
+from ..data_utils import (
+    to_coco, from_coco, get_image_path, SEG_FP, print_metrics)
 from ..viz import visualize_boxes
 from ..metric import score_boxes, get_metrics
 from .dataset import get_target_boxes_labels
@@ -127,13 +128,8 @@ def evaluate(model, data_loader, device, output_dir, threshold):
 
     metric_logger.synchronize_between_processes()
     print('Averaged stats:', metric_logger)
-
     metrics = get_metrics(scores)
-    for k, v in metrics.items():
-        if isinstance(v, float):
-            print(f'{k}: {v:.4f}')
-        else:
-            print(f'{k}: {v}')
+    print_metrics(metrics)
 
     return metrics, (scores, clf_gt)
 

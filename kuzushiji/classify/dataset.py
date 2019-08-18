@@ -60,8 +60,9 @@ def get_transform(train: bool, normalize: bool = True) -> Callable:
 def collate_fn(batch):
     images = torch.stack([img for (img, _), _ in batch])
     boxes = [b for (_, b), _ in batch]
-    labels = torch.cat([l for (_, _), l in batch])
-    return (images, boxes), labels
+    labels = torch.cat([l for (_, _), (l, _) in batch])
+    meta = [m for (_, _), (_, m) in batch]
+    return (images, boxes), (labels, meta)
 
 
 def get_encoded_classes() -> Dict[str, int]:
@@ -88,6 +89,7 @@ class Dataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         item = self.df.iloc[idx]
         image = read_image(get_image_path(item, self.root))
+        original_h, original_w, _ = image.shape
         if item.labels:
             labels = np.array(item.labels.split(' ')).reshape(-1, 5)
         else:
@@ -116,4 +118,15 @@ class Dataset(torch.utils.data.Dataset):
         boxes[:, 2] += boxes[:, 0]
         boxes[:, 3] += boxes[:, 1]
         labels = torch.tensor(xy['labels'], dtype=torch.long)
-        return (image, boxes), labels
+        _, h, w = image.shape
+        meta = {
+            'image_id': item.image_id,
+            'scale_h': original_h / h,
+            'scale_w': original_w / w,
+        }
+        return (image, boxes), (labels, meta)
+
+
+def get_labels(y):
+    labels, meta = y
+    return labels

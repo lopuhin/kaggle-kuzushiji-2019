@@ -4,12 +4,11 @@ from typing import Callable
 
 import albumentations as A
 from albumentations.pytorch import ToTensor
-import cv2
 import numpy as np
 import pandas as pd
 import torch.utils.data
 
-from ..data_utils import get_image_path, read_image
+from ..data_utils import get_image_path, read_image, get_target_boxes_labels
 
 
 def get_transform(train: bool) -> Callable:
@@ -53,16 +52,6 @@ def get_transform(train: bool) -> Callable:
             'label_fields': ['labels'],
         },
     )
-
-
-def get_target_boxes_labels(item):
-    if item.labels:
-        labels = np.array(item.labels.split(' ')).reshape(-1, 5)
-    else:
-        labels = np.zeros((0, 5))
-    boxes = labels[:, 1:].astype(np.float)
-    labels = labels[:, 0]
-    return boxes, labels
 
 
 class Dataset(torch.utils.data.Dataset):

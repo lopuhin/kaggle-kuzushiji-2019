@@ -89,6 +89,7 @@ def score_page(preds, truth):
 
 
 def score_boxes(truth_boxes, truth_label, preds_center, preds_label):
+    assert isinstance(preds_label, np.ndarray)
     tp = fp = fn = 0
     preds_x = preds_center[:, 0]
     preds_y = preds_center[:, 1]

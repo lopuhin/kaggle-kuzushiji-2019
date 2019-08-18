@@ -1,5 +1,6 @@
 import re
 from pathlib import Path
+from typing import Dict
 
 import cv2
 import pandas as pd
@@ -47,6 +48,24 @@ def read_image(path: Path) -> np.ndarray:
     image = cv2.imread(str(path))
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     return image
+
+
+def get_target_boxes_labels(item):
+    if item.labels:
+        labels = np.array(item.labels.split(' ')).reshape(-1, 5)
+    else:
+        labels = np.zeros((0, 5))
+    boxes = labels[:, 1:].astype(np.float)
+    labels = labels[:, 0]
+    return boxes, labels
+
+
+def print_metrics(metrics: Dict):
+    for k, v in metrics.items():
+        if isinstance(v, float):
+            print(f'{k}: {v:.4f}')
+        else:
+            print(f'{k}: {v}')
 
 
 def _get_book_id(image_id):

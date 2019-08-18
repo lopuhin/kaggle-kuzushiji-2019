@@ -49,7 +49,7 @@ def main():
         help='decrease lr by a factor of lr-gamma')
     arg('--print-freq', default=100, type=int, help='print frequency')
     arg('--output-dir', help='path where to save')
-    arg('--resume', default='', help='resume from checkpoint')
+    arg('--resume', help='resume from checkpoint')
     arg('--test-only', help='Only test the model', action='store_true')
     arg('--pretrained', type=int, default=1,
         help='Use pre-trained models from the modelzoo')
