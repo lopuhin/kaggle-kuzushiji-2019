@@ -58,6 +58,9 @@ def main():
     df_clf_gt = load_train_df(args.clf_gt)
     if args.submission:
         df_valid = df_train = df_clf_gt
+        empty_index = df_valid['labels'] == ''
+        empty_pages = df_valid[empty_index]['image_id'].values
+        df_valid = df_valid[~empty_pages]
         root = TEST_ROOT
     else:
         df_train, df_valid = [
@@ -184,6 +187,8 @@ def main():
                     f'{cls} {int(round(x))} {int(round(y))}'
                     for (x, y), cls in prediction),
             })
+        submission.extend(
+            {'image_id': image_id, 'labels': ''} for image_id in empty_pages)
         pd.DataFrame(submission).to_csv(
             output_dir / f'submission_{output_dir.name}.csv')
 
