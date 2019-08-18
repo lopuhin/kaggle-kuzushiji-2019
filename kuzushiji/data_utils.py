@@ -10,6 +10,7 @@ import torch
 
 DATA_ROOT = Path(__file__).parent.parent / 'data'
 TRAIN_ROOT = DATA_ROOT / 'train_images'
+TEST_ROOT = DATA_ROOT / 'test_images'
 
 UNICODE_MAP = {codepoint: char for codepoint, char in
                pd.read_csv(DATA_ROOT / 'unicode_translation.csv').values}

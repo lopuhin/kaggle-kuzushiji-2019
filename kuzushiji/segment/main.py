@@ -25,7 +25,7 @@ from .engine import train_one_epoch, evaluate
 
 from .import utils
 from .dataset import Dataset, get_transform
-from ..data_utils import TRAIN_ROOT, load_train_valid_df
+from ..data_utils import DATA_ROOT, TRAIN_ROOT, TEST_ROOT, load_train_valid_df
 
 
 def main():
@@ -51,6 +51,8 @@ def main():
     arg('--output-dir', help='path where to save')
     arg('--resume', help='resume from checkpoint')
     arg('--test-only', help='Only test the model', action='store_true')
+    arg('--submission', help='Create submission predictions',
+        action='store_true')
     arg('--pretrained', type=int, default=1,
         help='Use pre-trained models from the modelzoo')
     arg('--score-threshold', type=float, default=0.5)
@@ -68,6 +70,8 @@ def main():
         help='url used to set up distributed training')
 
     args = parser.parse_args()
+    if args.test_only and args.submission:
+        parser.error('pass one of --test-only and --submission')
 
     output_dir = Path(args.output_dir) if args.output_dir else None
     if output_dir:
@@ -82,10 +86,15 @@ def main():
     print('Loading data')
 
     df_train, df_valid = load_train_valid_df(args.fold, args.n_folds)
+    if args.submission:
+        df_valid = pd.read_csv(DATA_ROOT / 'sample_submission.csv')
+        df_valid = df_valid[:10]
     dataset = Dataset(
         df_train, get_transform(train=True), TRAIN_ROOT, skip_empty=False)
     dataset_test = Dataset(
-        df_valid, get_transform(train=False), TRAIN_ROOT, skip_empty=False)
+        df_valid, get_transform(train=False),
+        root=TEST_ROOT if args.submission else TRAIN_ROOT,
+        skip_empty=False)
 
     print('Creating data loaders')
     if args.distributed:
@@ -139,11 +148,15 @@ def main():
             pd.DataFrame(scores).to_csv(output_dir / 'eval.csv', index=None)
             pd.DataFrame(clf_gt).to_csv(output_dir / 'clf_gt.csv', index=None)
 
-    if args.test_only:
+    if args.test_only or args.submission:
         _, eval_results = evaluate(
             model, data_loader_test, device=device, output_dir=output_dir,
             threshold=args.score_threshold)
-        save_eval_results(eval_results)
+        if args.test_only:
+            save_eval_results(eval_results)
+        elif output_dir:
+            pd.DataFrame(eval_results[1]).to_csv(
+                output_dir / 'test_predictions.csv', index=None)
         return
 
     print('Start training')
