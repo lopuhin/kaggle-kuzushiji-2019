@@ -52,6 +52,7 @@ def main():
         df_clf_gt[df_clf_gt['image_id'].isin(set(df['image_id']))]
         for df in [df_train_gt, df_valid_gt]]
     df_valid = df_valid[df_valid['labels'] != '']
+    print(f'{len(df_train):,} in train, {len(df_valid):,} in valid')
     classes = get_encoded_classes()
     dataset = Dataset(
         df=pd.concat([df_train] * args.repeat_train),
@@ -88,7 +89,7 @@ def main():
 
     trainer = create_supervised_trainer(
         model, optimizer,
-        loss_fn=lambda x: loss(get_output(x)),
+        loss_fn=lambda y_pred, y: loss(get_output(y_pred), y),
         device=device,
     )
     evaluator = create_supervised_evaluator(
@@ -146,9 +147,9 @@ def main():
 
 class GetPredictions(Metric):
     def __init__(self, classes: Dict[str, int], *args, **kwargs):
-        super().__init__(*args, **kwargs)
         self._predictions = []
         self._classes = {idx: cls for cls, idx in classes.items()}
+        super().__init__(*args, **kwargs)
 
     def reset(self):
         self._predictions.clear()
