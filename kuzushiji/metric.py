@@ -81,7 +81,7 @@ def score_page(preds, truth):
 
     return score_boxes(
         truth_boxes=np.stack(
-            [truth_xmin, truth_ymin, truth_ymax, truth_ymax]).T,
+            [truth_xmin, truth_ymin, truth_xmax, truth_ymax]).T,
         truth_label=truth_label,
         preds_center=np.stack([preds_x, preds_y]),
         preds_label=preds_label,
@@ -91,6 +91,12 @@ def score_page(preds, truth):
 def score_boxes(truth_boxes, truth_label, preds_center, preds_label):
     assert isinstance(preds_label, np.ndarray)
     tp = fp = fn = 0
+    # need to handle the same edge cases here as well
+    if truth_boxes.shape[0] == 0 or preds_center.shape[0] == 0:
+        fp += preds_center.shape[0]
+        fn += truth_boxes.shape[0]
+        return {'tp': tp, 'fp': fp, 'fn': fn}
+
     preds_x = preds_center[:, 0]
     preds_y = preds_center[:, 1]
     truth_xmin, truth_ymin, truth_xmax, truth_ymax = truth_boxes.T

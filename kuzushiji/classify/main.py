@@ -147,7 +147,8 @@ def main():
             'accuracy': evaluator.state.metrics['accuracy'],
         }
         scores = []
-        for prediction, meta in evaluator.state.metrics['predictions']:
+        for prediction, meta in tqdm.tqdm(
+                evaluator.state.metrics['predictions'], desc='metrics'):
             item = gt_by_image_id[meta['image_id']]
             target_boxes, target_labels = get_target_boxes_labels(item)
             target_boxes = torch.from_numpy(target_boxes)
