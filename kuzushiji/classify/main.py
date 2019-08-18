@@ -184,6 +184,7 @@ def main():
             parser.error('please pass --resume when running with --test-only')
         metrics = evaluate()
         print_metrics(metrics)
+        return
 
     trainer.run(data_loader, max_epochs=args.epochs)
 
