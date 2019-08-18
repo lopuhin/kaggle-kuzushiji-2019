@@ -49,4 +49,13 @@ Run
         --resume _runs/fold0/model_last.pth \
         --submission
 
+#. Create submission from classification model, using file created by the
+   previous command as the first argument::
+
+    python -m kuzushiji.classify.main \
+        _runs/fold0/test_predictions.csv \
+        --output-dir _runs/clf \
+        --resume _runs/clf/model_last.pth \
+        --submission
+
 .

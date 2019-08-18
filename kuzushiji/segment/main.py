@@ -51,8 +51,7 @@ def main():
     arg('--output-dir', help='path where to save')
     arg('--resume', help='resume from checkpoint')
     arg('--test-only', help='Only test the model', action='store_true')
-    arg('--submission', help='Create submission predictions',
-        action='store_true')
+    arg('--submission', help='Create test predictions', action='store_true')
     arg('--pretrained', type=int, default=1,
         help='Use pre-trained models from the modelzoo')
     arg('--score-threshold', type=float, default=0.5)
@@ -86,16 +85,15 @@ def main():
     print('Loading data')
 
     df_train, df_valid = load_train_valid_df(args.fold, args.n_folds)
+    root = TRAIN_ROOT
     if args.submission:
         df_valid = pd.read_csv(DATA_ROOT / 'sample_submission.csv')
         df_valid['labels'] = ''
-        df_valid = df_valid[:10]
+        root = TEST_ROOT
     dataset = Dataset(
-        df_train, get_transform(train=True), TRAIN_ROOT, skip_empty=False)
+        df_train, get_transform(train=True), root, skip_empty=False)
     dataset_test = Dataset(
-        df_valid, get_transform(train=False),
-        root=TEST_ROOT if args.submission else TRAIN_ROOT,
-        skip_empty=False)
+        df_valid, get_transform(train=False), root, skip_empty=False)
 
     print('Creating data loaders')
     if args.distributed:
