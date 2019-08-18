@@ -107,13 +107,13 @@ def evaluate(model, data_loader, device, output_dir, threshold):
                     ).t().numpy(),
                     preds_label=np.ones(boxes.shape[0]),
                 ), image_id=item.image_id))
-           #clf_gt.append({
-           #    'labels': get_clf_gt(
-           #        target_boxes=target_boxes,
-           #        target_labels=target_labels,
-           #        boxes=scaled_boxes),
-           #    'image_id': item.image_id,
-           #})
+            clf_gt.append({
+                'labels': get_clf_gt(
+                    target_boxes=target_boxes,
+                    target_labels=target_labels,
+                    boxes=scaled_boxes),
+                'image_id': item.image_id,
+            })
             if output_dir:
                 unscaled_target_boxes = _scaled_boxes(
                     target_boxes, 1 / w_scale, 1 / h_scale)
@@ -160,21 +160,25 @@ def get_clf_gt(target_boxes, target_labels, boxes, min_iou=0.5) -> str:
     in the same format as original ground truth, with addition of a class for
     false negatives. Perform matching using box IoU.
     """
-    target_boxes = target_boxes.numpy()
-    boxes = boxes.numpy()
-    ious = bbox_overlaps(target_boxes, boxes)
-    ious_argmax = np.argmax(ious, axis=0)
-    assert ious_argmax.shape == (len(boxes),)
-    labels = []
-    for k in range(len(boxes)):
-        n = ious_argmax[k]
-        if ious[n, k] >= min_iou:
-            label = target_labels[n]
-        else:
-            label = SEG_FP
-        labels.append(label)
+    if boxes.shape[0] == 0:
+        return ''
+    if target_boxes.shape[0] == 0:
+        labels = [SEG_FP] * boxes.shape[0]
+    else:
+        ious = bbox_overlaps(from_coco(target_boxes).numpy(),
+                             from_coco(boxes).numpy())
+        ious_argmax = np.argmax(ious, axis=0)
+        assert ious_argmax.shape == (boxes.shape[0],)
+        labels = []
+        for k in range(boxes.shape[0]):
+            n = ious_argmax[k]
+            if ious[n, k] >= min_iou:
+                label = target_labels[n]
+            else:
+                label = SEG_FP
+            labels.append(label)
     return ' '.join(
-        ' '.join(str(int(round(x))) for x in box) + ' ' + label
+        ' '.join(str(int(round(float(x)))) for x in box) + ' ' + label
         for box, label in zip(boxes, labels))
 
 
