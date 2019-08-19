@@ -55,7 +55,7 @@ Run
     python -m kuzushiji.classify.main \
         _runs/fold0/test_predictions.csv \
         --output-dir _runs/clf \
-        --resume _runs/clf/model_last.pth \
+        --resume _runs/clf/model_best.pth \
         --submission
 
 .

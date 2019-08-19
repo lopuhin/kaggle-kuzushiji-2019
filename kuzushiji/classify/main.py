@@ -37,7 +37,7 @@ def main():
     arg('--lr', default=2.5e-5, type=float, help='initial learning rate')
     arg('--epochs', default=30, type=int,
         help='number of total epochs to run')
-    arg('--output-dir', help='path where to save', type=Path)
+    arg('--output-dir', help='path where to save')
     arg('--resume', help='resume from checkpoint')
     arg('--test-only', help='Only test the model', action='store_true')
     arg('--submission', help='Create submission', action='store_true')
@@ -97,7 +97,7 @@ def main():
         num_workers=args.workers)
 
     print('Creating model')
-    model = build_model(base=args.base, n_classes=len(classes))
+    model: nn.Module = build_model(base=args.base, n_classes=len(classes))
     print(model)
     device = torch.device(args.device)
     model.to(device)
@@ -133,6 +133,7 @@ def main():
     epoch_pbar = tqdm.trange(len(data_loader))
     train_losses = deque(maxlen=20)
     step = 0
+    best_f1 = 0
 
     @trainer.on(Events.ITERATION_COMPLETED)
     def log_training_loss(_):
@@ -142,15 +143,18 @@ def main():
         epoch_pbar.set_postfix(loss=f'{smoothed_loss:.4f}')
         epoch_pbar.update(1)
         step += 1
-        if step % 20 == 0 and args.output_dir:
+        if step % 20 == 0 and output_dir:
             json_log_plots.write_event(
-                args.output_dir, step=step * args.batch_size,
+                output_dir, step=step * args.batch_size,
                 loss=smoothed_loss)
+
+    def save_model(name: str):
+        if output_dir:
+            torch.save(model.state_dict(), output_dir / name)
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def checkpoint(_):
-        if args.output_dir:
-            torch.save(model.state_dict(), args.output_dir / 'model_last.pth')
+        save_model('model_last.pth')
 
     def evaluate():
         _run_with_pbar(evaluator, data_loader_test, desc='evaluate')
@@ -195,10 +199,16 @@ def main():
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_validation_results(_):
+        nonlocal best_f1
         metrics = evaluate()
-        if args.output_dir:
+        if output_dir:
             json_log_plots.write_event(
-                args.output_dir, step=step * args.batch_size, **metrics)
+                output_dir, step=step * args.batch_size, **metrics)
+        if metrics['f1'] > best_f1:
+            best_f1 = metrics['f1']
+            if output_dir:
+                print('Updating best model')
+                save_model('model_best.pth')
         epochs_pbar.set_postfix({k: f'{v:.4f}' for k, v in metrics.items()})
 
     @trainer.on(Events.EPOCH_COMPLETED)
@@ -211,8 +221,7 @@ def main():
             parser.error('please pass --resume when running with --test-only '
                          'or --submission')
         if args.test_only:
-            metrics = evaluate()
-            print_metrics(metrics)
+            print_metrics(evaluate())
         elif args.submission:
             if not output_dir:
                 parser.error('--output-dir required with --submission')
