@@ -217,7 +217,6 @@ def main():
         if metrics['f1'] > best_f1:
             best_f1 = metrics['f1']
             if output_dir:
-                print('Updating best model')
                 save_model('model_best.pth')
         epochs_pbar.set_postfix({k: f'{v:.4f}' for k, v in metrics.items()})
 
