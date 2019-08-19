@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 import tqdm
 
 from ..data_utils import (
-    TRAIN_ROOT, TEST_ROOT, load_train_valid_df, load_train_df,
+    TRAIN_ROOT, TEST_ROOT, load_train_valid_df, load_train_df, to_coco,
     SEG_FP, from_coco, get_target_boxes_labels, print_metrics, scaled_boxes)
 from ..metric import score_boxes, get_metrics
 from .dataset import (
@@ -44,6 +44,8 @@ def main():
     arg('--fold', type=int, default=0)
     arg('--n-folds', type=int, default=5)
     arg('--repeat-train', type=int, default=4)
+    arg('--train-limit', type=int)
+    arg('--test-limit', type=int)
     args = parser.parse_args()
     if args.test_only and args.submission:
         parser.error('pass one of --test-only and --submission')
@@ -68,6 +70,10 @@ def main():
             for df in [df_train_gt, df_valid_gt]]
         df_valid = df_valid[df_valid['labels'] != '']
         root = TRAIN_ROOT
+    if args.train_limit:
+        df_train = df_train.sample(n=args.train_limit, random_state=42)
+    if args.test_limit:
+        df_valid = df_valid.sample(n=args.test_limit, random_state=42)
     gt_by_image_id = {item.image_id: item for item in df_valid_gt.itertuples()}
     print(f'{len(df_train):,} in train, {len(df_valid):,} in valid')
     classes = get_encoded_classes()
@@ -127,6 +133,7 @@ def main():
             'accuracy': Accuracy(output_transform=get_y_pred_y),
             'loss': Loss(loss, output_transform=get_y_pred_y),
             'predictions': GetPredictions(classes),
+            'errors': GetErrors(classes),
         })
 
     epochs_pbar = tqdm.trange(args.epochs)
@@ -178,6 +185,9 @@ def main():
                     preds_label=np.array(pred_labels),
                 ), image_id=item.image_id))
         metrics.update(get_metrics(scores))
+        if output_dir:
+            pd.DataFrame(evaluator.state.metrics['errors']).to_csv(
+                output_dir / 'errors.csv', index=None)
         return metrics
 
     def make_submission():
@@ -269,6 +279,36 @@ class GetPredictions(Metric):
 
     def compute(self):
         return self._predictions
+
+
+class GetErrors(Metric):
+    def __init__(self, classes: Dict[str, int], **kwargs):
+        self._classes = {idx: cls for cls, idx in classes.items()}
+        self._errors = []
+        super().__init__(**kwargs)
+
+    def reset(self):
+        self._errors.clear()
+
+    def update(self, output):
+        (y_pred, (boxes,)), (y, (meta,)) = output
+        y_pred = y_pred.argmax(dim=1)
+        boxes = to_coco(scaled_boxes(boxes, meta['scale_w'], meta['scale_h']))
+        assert y_pred.shape == y.shape == (boxes.shape[0],)
+        for box, y_pred_i, y_i in zip(boxes, y_pred, y):
+            x, y, w, h = map(float, box)
+            self._errors.append({
+                'image_id': meta['image_id'],
+                'x': x,
+                'y': y,
+                'w': w,
+                'h': h,
+                'pred': self._classes[int(y_pred_i)],
+                'true': self._classes[int(y_i)],
+            })
+
+    def compute(self):
+        return self._errors
 
 
 if __name__ == '__main__':
