@@ -6,10 +6,11 @@ from functools import lru_cache
 from pathlib import Path
 
 import cv2
+import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
-from .data_utils import DATA_ROOT, UNICODE_MAP
+from .data_utils import DATA_ROOT, TRAIN_ROOT, UNICODE_MAP
 
 
 @lru_cache()
@@ -83,3 +84,32 @@ def visualize_boxes(image: np.ndarray, boxes, **kwargs):
     for idx, bbox in enumerate(boxes):
         visualize_box(image, bbox, **kwargs)
     return image
+
+
+def visualize_clf_errors(image_id: str, df: pd.DataFrame):
+    """ Visualize classification errors (df comes from errors.csv).
+    """
+    items = df[df['image_id'] == image_id]
+    err_items = items[items['pred'] != items['true']]
+    err_items_chars = err_items[err_items['true'] != 'seg_fp']
+    err_items_seg_fp = err_items[err_items['true'] == 'seg_fp']
+    good_items = items[items['pred'] == items['true']]
+    good_items_seg_fp = good_items[good_items['true'] == 'seg_fp']
+    good_items_chars = good_items[good_items['true'] != 'seg_fp']
+    title = (
+        f'{image_id} acc={1 - len(err_items) / len(items):.2f} '
+        f'errors_chars={len(err_items_chars)} '
+        f'errors_seg_fp={len(err_items_seg_fp)} '
+        f'good_chars={len(good_items_chars)} '
+        f'good_seg_fp={len(good_items_seg_fp)}')
+    image = np.array(Image.open(TRAIN_ROOT / f'{image_id}.jpg').convert('RGB'))
+    to_boxes = lambda x: [
+        (item.x, item.y, item.w, item.h) for item in x.itertuples()]
+    image = visualize_boxes(image, to_boxes(err_items_chars), thickness=4)
+    image = visualize_boxes(
+        image, to_boxes(err_items_seg_fp), thickness=4, color=(255, 0, 255))
+    image = visualize_boxes(
+        image, to_boxes(good_items_seg_fp), thickness=4, color=(0, 0, 255))
+    image = visualize_boxes(
+        image, to_boxes(good_items_chars), thickness=4, color=(0, 255, 0))
+    return image, title
