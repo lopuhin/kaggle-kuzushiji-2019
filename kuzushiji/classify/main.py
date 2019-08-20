@@ -107,12 +107,22 @@ def main():
     print(model)
     device = torch.device(args.device)
     model.to(device)
-
-    if args.resume:
-        model.load_state_dict(torch.load(args.resume, map_location='cpu'))
-
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     loss = nn.CrossEntropyLoss()
+    step = epoch = 0
+    best_f1 = 0
+
+    if args.resume:
+        state = torch.load(args.resume, map_location='cpu')
+        if 'optimizer' in state:
+            optimizer.load_state_dict(state['optimizer'])
+            model.load_state_dict(state['model'])
+            step = state['step']
+            epoch = state['epoch']
+            best_f1 = state['best_f1']
+        else:
+            model.load_state_dict(state)
+        del state
 
     trainer = create_supervised_trainer(
         model, optimizer,
@@ -136,11 +146,10 @@ def main():
             'errors': GetErrors(classes),
         })
 
-    epochs_pbar = tqdm.trange(args.epochs)
+    epochs_left = args.epochs - epoch
+    epochs_pbar = tqdm.trange(epochs_left)
     epoch_pbar = tqdm.trange(len(data_loader))
     train_losses = deque(maxlen=20)
-    step = 0
-    best_f1 = 0
 
     @trainer.on(Events.ITERATION_COMPLETED)
     def log_training_loss(_):
@@ -155,13 +164,16 @@ def main():
                 output_dir, step=step * args.batch_size,
                 loss=smoothed_loss)
 
-    def save_model(name: str):
-        if output_dir:
-            torch.save(model.state_dict(), output_dir / name)
-
     @trainer.on(Events.EPOCH_COMPLETED)
     def checkpoint(_):
-        save_model('model_last.pth')
+        if output_dir:
+            torch.save({
+                'model': model.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'step': step,
+                'epoch': epoch,
+                'best_f1': best_f1,
+            }, output_dir / 'checkpoint.pth')
 
     def evaluate():
         _run_with_pbar(evaluator, data_loader_test, desc='evaluate')
@@ -217,13 +229,15 @@ def main():
         if metrics['f1'] > best_f1:
             best_f1 = metrics['f1']
             if output_dir:
-                save_model('model_best.pth')
+                torch.save(model.state_dict(), output_dir / 'model_best.pth')
         epochs_pbar.set_postfix({k: f'{v:.4f}' for k, v in metrics.items()})
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def update_pbars_on_epoch_completion(_):
+        nonlocal epoch
         epochs_pbar.update(1)
         epoch_pbar.reset()
+        epoch += 1
 
     if args.test_only or args.submission:
         if not args.resume:
@@ -237,7 +251,7 @@ def main():
             make_submission()
         return
 
-    trainer.run(data_loader, max_epochs=args.epochs)
+    trainer.run(data_loader, max_epochs=epochs_left)
 
 
 def _run_with_pbar(engine, loader, desc=None):

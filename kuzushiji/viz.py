@@ -8,7 +8,6 @@ from pathlib import Path
 import cv2
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
-import torch
 
 from .data_utils import DATA_ROOT, UNICODE_MAP
 
