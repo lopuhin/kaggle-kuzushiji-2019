@@ -63,10 +63,14 @@ def get_target_boxes_labels(item):
 
 def print_metrics(metrics: Dict):
     for k, v in metrics.items():
-        if isinstance(v, float):
-            print(f'{k}: {v:.4f}')
-        else:
-            print(f'{k}: {v}')
+        print(f'{k}: {format_value(v)}')
+
+
+def format_value(v):
+    if isinstance(v, float):
+        return f'{v:.4f}'
+    else:
+        return str(v)
 
 
 def _get_book_id(image_id):

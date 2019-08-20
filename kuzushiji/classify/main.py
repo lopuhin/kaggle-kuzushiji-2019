@@ -17,7 +17,8 @@ import tqdm
 
 from ..data_utils import (
     TRAIN_ROOT, TEST_ROOT, load_train_valid_df, load_train_df, to_coco,
-    SEG_FP, from_coco, get_target_boxes_labels, print_metrics, scaled_boxes)
+    SEG_FP, from_coco, get_target_boxes_labels, print_metrics, scaled_boxes,
+    format_value)
 from ..metric import score_boxes, get_metrics
 from .dataset import (
     Dataset, get_transform, get_encoded_classes, collate_fn, get_labels)
@@ -230,7 +231,8 @@ def main():
             best_f1 = metrics['f1']
             if output_dir:
                 torch.save(model.state_dict(), output_dir / 'model_best.pth')
-        epochs_pbar.set_postfix({k: f'{v:.4f}' for k, v in metrics.items()})
+        epochs_pbar.set_postfix({
+            k: format_value(v) for k, v in metrics.items()})
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def update_pbars_on_epoch_completion(_):
