@@ -1,5 +1,6 @@
 import argparse
 from collections import deque
+import json
 from pathlib import Path
 import pandas as pd
 from typing import Dict
@@ -55,6 +56,9 @@ def main():
     output_dir = Path(args.output_dir) if args.output_dir else None
     if output_dir:
         output_dir.mkdir(parents=True, exist_ok=True)
+        if not args.resume:
+            (output_dir / 'params.json').write_text(
+                json.dumps(vars(args), indent=4))
 
     print('Loading data')
     df_train_gt, df_valid_gt = load_train_valid_df(args.fold, args.n_folds)
