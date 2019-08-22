@@ -4,6 +4,7 @@ https://www.kaggle.com/anokas/kuzushiji-visualisation
 """
 from functools import lru_cache
 from pathlib import Path
+from typing import List, Tuple
 
 import cv2
 import pandas as pd
@@ -29,7 +30,9 @@ def load_font(fontsize: int):
 
 
 def visualize_training_data(
-        image_path: Path, labels: str, fontsize: int = 50,
+        image_path: Path,
+        labels: List[Tuple[str, int, int, int, int]],
+        fontsize: int = 50,
         with_labels: bool = True):
     """ This function takes in a filename of an image,
     and the labels in the string format given in train.csv,
@@ -38,11 +41,8 @@ def visualize_training_data(
     """
     # Read image
     img = Image.open(image_path).convert('RGBA')
-    if not labels:
+    if len(labels) == 0:
         return img
-
-    # Convert annotation string to array
-    labels = np.array(labels.split(' ')).reshape(-1, 5)
 
     bbox_canvas = Image.new('RGBA', img.size)
     char_canvas = Image.new('RGBA', img.size)
