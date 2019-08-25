@@ -5,7 +5,6 @@ from pathlib import Path
 
 from ignite.engine import (
     Events, create_supervised_evaluator, create_supervised_trainer)
-from ignite.utils import convert_tensor
 from ignite.metrics import Loss
 import json_log_plots
 import pandas as pd
@@ -71,7 +70,6 @@ def main():
     print('Creating model')
     model: nn.Module = build_model(n_classes=len(classes))
     print(model)
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
     device = torch.device(args.device)
     model.to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -83,11 +81,10 @@ def main():
         model.load_state_dict(torch.load(args.resume, map_location='cpu'))
 
     trainer = create_supervised_trainer(
-        model, optimizer, loss, device=device, prepare_batch=prepare_batch)
+        model, optimizer, loss, device=device)
     evaluator = create_supervised_evaluator(
         model,
         device=device,
-        prepare_batch=prepare_batch,
         metrics={
             'loss': Loss(loss),
         })
@@ -144,12 +141,6 @@ def main():
         return
 
     trainer.run(data_loader, max_epochs=args.epochs)
-
-
-def prepare_batch(x, *args, **kwargs):
-    x = convert_tensor(x, *args, **kwargs)
-    y = x[:, 1:]
-    return x, y
 
 
 if __name__ == '__main__':

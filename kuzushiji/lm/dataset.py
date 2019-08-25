@@ -17,11 +17,14 @@ class Dataset(torch.utils.data.Dataset):
             torch.tensor([classes[s] for s in text.split(' ')],
                          dtype=torch.long)
             for text in df['text'].values]
+        # FIXME this will oversample text from longer sequences
+        # TODO maybe instead text should have "line breaks"?
         self.data = [
-            text[i: i + seq_length]
+            (text[i: i + seq_length],
+             text[i + 1: i + seq_length + 1])
             for text in texts
-            for i in range(0, text.shape[0] - seq_length + 1)
-            if text.shape[0] >= seq_length]
+            for i in range(0, text.shape[0] - seq_length)
+            if text.shape[0] > seq_length]
 
     def __len__(self):
         return len(self.data)
