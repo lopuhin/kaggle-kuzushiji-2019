@@ -61,16 +61,13 @@ def get_target_boxes_labels(item):
     return boxes, labels
 
 
-def print_metrics(metrics: Dict):
-    for k, v in metrics.items():
-        print(f'{k}: {format_value(v)}')
-
-
-def format_value(v):
-    if isinstance(v, float):
-        return f'{v:.4f}'
-    else:
-        return str(v)
+def get_encoded_classes() -> Dict[str, int]:
+    classes = {SEG_FP}
+    df_train = load_train_df()
+    for s in df_train['labels'].values:
+        x = s.split()
+        classes.update(x[i] for i in range(0, len(x), 5))
+    return {cls: i for i, cls in enumerate(sorted(classes))}
 
 
 def _get_book_id(image_id):

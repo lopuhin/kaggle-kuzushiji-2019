@@ -18,11 +18,11 @@ import tqdm
 
 from ..data_utils import (
     TRAIN_ROOT, TEST_ROOT, load_train_valid_df, load_train_df, to_coco,
-    SEG_FP, from_coco, get_target_boxes_labels, print_metrics, scaled_boxes,
-    format_value)
+    SEG_FP, from_coco, get_target_boxes_labels, scaled_boxes,
+    get_encoded_classes)
+from ..utils import run_with_pbar, print_metrics, format_value
 from ..metric import score_boxes, get_metrics
-from .dataset import (
-    Dataset, get_transform, get_encoded_classes, collate_fn, get_labels)
+from .dataset import Dataset, get_transform, collate_fn, get_labels
 from .models import build_model, get_output
 
 
@@ -35,10 +35,9 @@ def main():
     arg('--device', default='cuda', help='device')
     arg('--batch-size', default=12, type=int)
     arg('--workers', default=12, type=int,
-        help='number of data loading workers (default: 16)')
+        help='number of data loading workers')
     arg('--lr', default=2.5e-5, type=float, help='initial learning rate')
-    arg('--epochs', default=30, type=int,
-        help='number of total epochs to run')
+    arg('--epochs', default=30, type=int, help='number of total epochs to run')
     arg('--output-dir', help='path where to save')
     arg('--resume', help='resume from checkpoint')
     arg('--test-only', help='Only test the model', action='store_true')
@@ -181,7 +180,7 @@ def main():
             }, output_dir / 'checkpoint.pth')
 
     def evaluate():
-        _run_with_pbar(evaluator, data_loader_test, desc='evaluate')
+        run_with_pbar(evaluator, data_loader_test, desc='evaluate')
         metrics = {
             'valid_loss': evaluator.state.metrics['loss'],
             'accuracy': evaluator.state.metrics['accuracy'],
@@ -208,7 +207,7 @@ def main():
         return metrics
 
     def make_submission():
-        _run_with_pbar(evaluator, data_loader_test, desc='evaluate')
+        run_with_pbar(evaluator, data_loader_test, desc='evaluate')
         submission = []
         for prediction, meta in tqdm.tqdm(
                 evaluator.state.metrics['predictions']):
@@ -258,13 +257,6 @@ def main():
         return
 
     trainer.run(data_loader, max_epochs=epochs_left)
-
-
-def _run_with_pbar(engine, loader, desc=None):
-    pbar = tqdm.trange(len(loader), desc=desc)
-    engine.on(Events.ITERATION_COMPLETED)(lambda _: pbar.update(1))
-    engine.run(loader)
-    pbar.close()
 
 
 def _prepare_batch(batch, device=None, non_blocking=False):

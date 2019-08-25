@@ -1,13 +1,33 @@
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
+import torch.utils.data
 import tqdm
 
 from ..data_utils import load_train_df, DATA_ROOT
 
 
 TRAIN_TEXTS_PATH = DATA_ROOT / 'train-texts.csv'
+
+
+class Dataset(torch.utils.data.Dataset):
+    def __init__(self, df, classes: Dict[str, int], seq_length: int):
+        texts = [
+            torch.tensor([classes[s] for s in text.split(' ')],
+                         dtype=torch.long)
+            for text in df['text'].values]
+        self.data = [
+            text[i: i + seq_length]
+            for text in texts
+            for i in range(0, text.shape[0] - seq_length + 1)
+            if text.shape[0] >= seq_length]
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx]
 
 
 def get_sequences(

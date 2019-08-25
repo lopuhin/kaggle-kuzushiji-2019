@@ -4,12 +4,11 @@ from typing import Callable, Dict
 
 import albumentations as A
 from albumentations.pytorch import ToTensor
-import cv2
 import numpy as np
 import pandas as pd
 import torch.utils.data
 
-from ..data_utils import load_train_df, get_image_path, read_image, SEG_FP
+from ..data_utils import get_image_path, read_image
 
 
 def get_transform(train: bool, normalize: bool = True) -> Callable:
@@ -63,15 +62,6 @@ def collate_fn(batch):
     labels = torch.cat([l for (_, _), (l, _) in batch])
     meta = [m for (_, _), (_, m) in batch]
     return (images, boxes), (labels, meta)
-
-
-def get_encoded_classes() -> Dict[str, int]:
-    classes = {SEG_FP}
-    df_train = load_train_df()
-    for s in df_train['labels'].values:
-        x = s.split()
-        classes.update(x[i] for i in range(0, len(x), 5))
-    return {cls: i for i, cls in enumerate(sorted(classes))}
 
 
 class Dataset(torch.utils.data.Dataset):
