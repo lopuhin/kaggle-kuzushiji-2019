@@ -53,7 +53,7 @@ def visualize_training_data(
 
     for codepoint, x, y, w, h in labels:
         x, y, w, h = int(x), int(y), int(w), int(h)
-        char = UNICODE_MAP[codepoint]
+        char = UNICODE_MAP.get(codepoint, codepoint)
 
         # Draw bounding box around character, and unicode character next to it
         bbox_draw.rectangle((x, y, x+w, y+h), fill=(255, 255, 255, 0),

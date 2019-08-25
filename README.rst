@@ -16,6 +16,10 @@ Install::
 Run
 ---
 
+#. Prepare data for the language model::
+
+    python -m kuzushiji.lm.dataset
+
 #. Train segmentation model across all folds::
 
     python -m kuzushiji.segment.main \
