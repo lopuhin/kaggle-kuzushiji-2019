@@ -1,3 +1,4 @@
+import random
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -13,24 +14,22 @@ TRAIN_TEXTS_PATH = DATA_ROOT / 'train-texts.csv'
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, df, classes: Dict[str, int], seq_length: int):
+        self.seq_length = seq_length
         texts = [
             torch.tensor([classes[s] for s in text.split(' ')],
                          dtype=torch.long)
             for text in df['text'].values]
-        # FIXME this will oversample text from longer sequences
-        # TODO maybe instead text should have "line breaks"?
-        self.data = [
-            (text[i: i + seq_length],
-             text[i + 1: i + seq_length + 1])
-            for text in texts
-            for i in range(0, text.shape[0] - seq_length)
-            if text.shape[0] > seq_length]
+        # TODO use all texts and pad
+        self.texts = [t for t in texts if t.shape[0] > seq_length]
 
     def __len__(self):
-        return len(self.data)
+        return len(self.texts)
 
     def __getitem__(self, idx):
-        return self.data[idx]
+        text = self.texts[idx]
+        i = random.randint(0, text.shape[0] - self.seq_length - 1)
+        return (text[i: i + self.seq_length],
+                text[i + 1: i + self.seq_length + 1])
 
 
 def get_sequences(
