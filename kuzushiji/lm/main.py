@@ -120,8 +120,8 @@ def main():
         if output_dir:
             json_log_plots.write_event(
                 output_dir, step=step * args.batch_size, **metrics)
-        if metrics['valid_loss'] > best_loss:
-            best_loss = metrics['best_loss']
+        if metrics['valid_loss'] < best_loss:
+            best_loss = metrics['valid_loss']
             if output_dir:
                 torch.save(model.state_dict(), output_dir / 'model_best.pth')
         epochs_pbar.set_postfix({
