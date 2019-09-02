@@ -191,8 +191,8 @@ def main():
             item = gt_by_image_id[meta['image_id']]
             target_boxes, target_labels = get_target_boxes_labels(item)
             target_boxes = torch.from_numpy(target_boxes)
-            pred_centers = np.array([xy for xy, _ in prediction])
-            pred_labels = [l for _, l in prediction]
+            pred_centers = np.array([p['center'] for p in prediction])
+            pred_labels = [p['cls'] for p in prediction]
             scores.append(
                 dict(score_boxes(
                     truth_boxes=from_coco(target_boxes).numpy(),
@@ -214,8 +214,9 @@ def main():
             submission.append({
                 'image_id': meta['image_id'],
                 'labels': ' '.join(
-                    f'{cls} {int(round(x))} {int(round(y))}'
-                    for (x, y), cls in prediction),
+                    ' '.join([p['cls']] +
+                             [str(int(round(v))) for v in p['center']])
+                    for p in prediction),
             })
         submission.extend(
             {'image_id': image_id, 'labels': ''} for image_id in empty_pages)
@@ -281,9 +282,9 @@ class GetPredictions(Metric):
         centers_x = 0.5 * (boxes[:, 0] + boxes[:, 2])
         centers_y = 0.5 * (boxes[:, 1] + boxes[:, 3])
         prediction = [
-            ((float(x) * meta['scale_w'],
-              float(y) * meta['scale_h']),
-             cls)
+            {'center': (float(x) * meta['scale_w'],
+                        float(y) * meta['scale_h']),
+             'cls': cls}
             for x, y, cls in zip(centers_x, centers_y, classes)
             if cls != SEG_FP]
         self._predictions.append((prediction, meta))
@@ -293,20 +294,24 @@ class GetPredictions(Metric):
 
 
 class GetErrors(Metric):
-    def __init__(self, classes: Dict[str, int], **kwargs):
+    def __init__(self, classes: Dict[str, int], top_k=50, **kwargs):
         self._classes = {idx: cls for cls, idx in classes.items()}
         self._errors = []
+        self._top_k = top_k
         super().__init__(**kwargs)
 
     def reset(self):
         self._errors.clear()
 
     def update(self, output):
-        (y_pred, (boxes,)), (y, (meta,)) = output
-        y_pred = y_pred.argmax(dim=1)
+        (y_pred_full, (boxes,)), (y, (meta,)) = output
+        y_pred = y_pred_full.argmax(dim=1)
         boxes = to_coco(scaled_boxes(boxes, meta['scale_w'], meta['scale_h']))
         assert y_pred.shape == y.shape == (boxes.shape[0],)
-        for box, y_pred_i, y_i in zip(boxes, y_pred, y):
+        top_k_logits, top_k_classes = (
+            v.cpu().numpy() for v in
+            torch.topk(y_pred_full, self._top_k, dim=1))
+        for i, (box, y_pred_i, y_i) in enumerate(zip(boxes, y_pred, y)):
             x, y, w, h = map(float, box)
             self._errors.append({
                 'image_id': meta['image_id'],
@@ -316,6 +321,8 @@ class GetErrors(Metric):
                 'h': h,
                 'pred': self._classes[int(y_pred_i)],
                 'true': self._classes[int(y_i)],
+                'top_k_logits': ' '.join(f'{v:.4f}' for v in top_k_logits[i]),
+                'top_k_classes': ' '.join(map(str, top_k_classes[i])),
             })
 
     def compute(self):
