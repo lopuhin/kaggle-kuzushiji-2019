@@ -223,6 +223,8 @@ def main():
         pd.DataFrame(submission).to_csv(
             output_dir / f'submission_{output_dir.name}.csv.gz',
             index=None)
+        pd.DataFrame(evaluator.state.metrics['errors']).to_csv(
+            output_dir / 'test_predictions.csv.gz', index=None)
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_validation_results(_):
@@ -308,25 +310,35 @@ class GetErrors(Metric):
         y_pred = y_pred_full.argmax(dim=1)
         boxes = to_coco(scaled_boxes(boxes, meta['scale_w'], meta['scale_h']))
         assert y_pred.shape == y.shape == (boxes.shape[0],)
-        top_k_logits, top_k_classes = (
-            v.cpu().numpy() for v in
-            torch.topk(y_pred_full, self._top_k, dim=1))
+        top_k_classes, top_k_logits = _get_top_k(y_pred_full, self._top_k)
         for i, (box, y_pred_i, y_i) in enumerate(zip(boxes, y_pred, y)):
             x, y, w, h = map(float, box)
-            self._errors.append({
-                'image_id': meta['image_id'],
-                'x': x,
-                'y': y,
-                'w': w,
-                'h': h,
-                'pred': self._classes[int(y_pred_i)],
-                'true': self._classes[int(y_i)],
-                'top_k_logits': ' '.join(f'{v:.4f}' for v in top_k_logits[i]),
-                'top_k_classes': ' '.join(map(str, top_k_classes[i])),
-            })
+            self._errors.append(dict(
+                image_id=meta['image_id'],
+                x=x,
+                y=y,
+                w=w,
+                h=h,
+                pred=self._classes[int(y_pred_i)],
+                true=self._classes[int(y_i)],
+                **_top_k_entry(top_k_classes, top_k_logits, i),
+            ))
 
     def compute(self):
         return self._errors
+
+
+def _get_top_k(y_pred, top_k: int):
+    top_k_logits, top_k_classes = (
+        v.cpu().numpy() for v in torch.topk(y_pred, top_k, dim=1))
+    return top_k_classes, top_k_logits
+
+
+def _top_k_entry(top_k_classes, top_k_logits, i):
+    return {
+        'top_k_logits': ' '.join(f'{v:.4f}' for v in top_k_logits[i]),
+        'top_k_classes': ' '.join(map(str, top_k_classes[i])),
+    }
 
 
 if __name__ == '__main__':

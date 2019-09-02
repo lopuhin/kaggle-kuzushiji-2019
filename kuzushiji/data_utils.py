@@ -42,7 +42,9 @@ def load_train_valid_df(fold: int, n_folds: int):
 
 
 def get_image_path(item, root: Path) -> Path:
-    return root / f'{item.image_id}.jpg'
+    path = root / f'{item.image_id}.jpg'
+    assert path.exists(), path
+    return path
 
 
 def read_image(path: Path) -> np.ndarray:
