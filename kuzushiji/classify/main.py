@@ -203,7 +203,7 @@ def main():
         metrics.update(get_metrics(scores))
         if output_dir:
             pd.DataFrame(evaluator.state.metrics['errors']).to_csv(
-                output_dir / 'errors.csv', index=None)
+                output_dir / 'errors.csv.gz', index=None)
         return metrics
 
     def make_submission():
@@ -221,7 +221,7 @@ def main():
         submission.extend(
             {'image_id': image_id, 'labels': ''} for image_id in empty_pages)
         pd.DataFrame(submission).to_csv(
-            output_dir / f'submission_{output_dir.name}.csv',
+            output_dir / f'submission_{output_dir.name}.csv.gz',
             index=None)
 
     @trainer.on(Events.EPOCH_COMPLETED)
