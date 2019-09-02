@@ -107,3 +107,13 @@ def scaled_boxes(
         boxes[:, 2] * w_scale,
         boxes[:, 3] * h_scale,
         ]).t()
+
+
+def submission_item(image_id, prediction):
+    return {
+        'image_id': image_id,
+        'labels': ' '.join(
+            ' '.join([p['cls']] +
+                     [str(int(round(v))) for v in p['center']])
+            for p in prediction),
+    }

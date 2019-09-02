@@ -19,7 +19,7 @@ import tqdm
 from ..data_utils import (
     TRAIN_ROOT, TEST_ROOT, load_train_valid_df, load_train_df, to_coco,
     SEG_FP, from_coco, get_target_boxes_labels, scaled_boxes,
-    get_encoded_classes)
+    get_encoded_classes, submission_item)
 from ..utils import run_with_pbar, print_metrics, format_value
 from ..metric import score_boxes, get_metrics
 from .dataset import Dataset, get_transform, collate_fn, get_labels
@@ -211,15 +211,10 @@ def main():
         submission = []
         for prediction, meta in tqdm.tqdm(
                 evaluator.state.metrics['predictions']):
-            submission.append({
-                'image_id': meta['image_id'],
-                'labels': ' '.join(
-                    ' '.join([p['cls']] +
-                             [str(int(round(v))) for v in p['center']])
-                    for p in prediction),
-            })
-        submission.extend(
-            {'image_id': image_id, 'labels': ''} for image_id in empty_pages)
+            submission.append(submission_item(
+                meta['image_id'], prediction))
+        submission.extend(submission_item(image_id, [])
+                          for image_id in empty_pages)
         pd.DataFrame(submission).to_csv(
             output_dir / f'submission_{output_dir.name}.csv.gz',
             index=None)
