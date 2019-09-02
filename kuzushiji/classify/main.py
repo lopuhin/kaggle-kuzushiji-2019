@@ -147,7 +147,7 @@ def main():
             'accuracy': Accuracy(output_transform=get_y_pred_y),
             'loss': Loss(loss, output_transform=get_y_pred_y),
             'predictions': GetPredictions(classes),
-            'errors': GetErrors(classes),
+            'detailed': GetDetailedPrediction(classes),
         })
 
     epochs_left = args.epochs - epoch
@@ -202,8 +202,8 @@ def main():
                 ), image_id=item.image_id))
         metrics.update(get_metrics(scores))
         if output_dir:
-            pd.DataFrame(evaluator.state.metrics['errors']).to_csv(
-                output_dir / 'errors.csv.gz', index=None)
+            pd.DataFrame(evaluator.state.metrics['detailed']).to_csv(
+                output_dir / 'detailed.csv.gz', index=None)
         return metrics
 
     def make_submission():
@@ -223,8 +223,8 @@ def main():
         pd.DataFrame(submission).to_csv(
             output_dir / f'submission_{output_dir.name}.csv.gz',
             index=None)
-        pd.DataFrame(evaluator.state.metrics['errors']).to_csv(
-            output_dir / 'test_predictions.csv.gz', index=None)
+        pd.DataFrame(evaluator.state.metrics['detailed']).to_csv(
+            output_dir / 'test_detailed.csv.gz', index=None)
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_validation_results(_):
@@ -295,15 +295,15 @@ class GetPredictions(Metric):
         return self._predictions
 
 
-class GetErrors(Metric):
+class GetDetailedPrediction(Metric):
     def __init__(self, classes: Dict[str, int], top_k=50, **kwargs):
         self._classes = {idx: cls for cls, idx in classes.items()}
-        self._errors = []
+        self._detailed = []
         self._top_k = top_k
         super().__init__(**kwargs)
 
     def reset(self):
-        self._errors.clear()
+        self._detailed.clear()
 
     def update(self, output):
         (y_pred_full, (boxes,)), (y, (meta,)) = output
@@ -313,7 +313,7 @@ class GetErrors(Metric):
         top_k_classes, top_k_logits = _get_top_k(y_pred_full, self._top_k)
         for i, (box, y_pred_i, y_i) in enumerate(zip(boxes, y_pred, y)):
             x, y, w, h = map(float, box)
-            self._errors.append(dict(
+            self._detailed.append(dict(
                 image_id=meta['image_id'],
                 x=x,
                 y=y,
@@ -325,7 +325,7 @@ class GetErrors(Metric):
             ))
 
     def compute(self):
-        return self._errors
+        return self._detailed
 
 
 def _get_top_k(y_pred, top_k: int):
