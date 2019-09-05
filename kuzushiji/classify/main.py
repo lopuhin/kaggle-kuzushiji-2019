@@ -5,8 +5,7 @@ from pathlib import Path
 import pandas as pd
 from typing import Dict
 
-from ignite.engine import (
-    Events, create_supervised_evaluator, create_supervised_trainer)
+from ignite.engine import Events, Engine, create_supervised_evaluator
 from ignite.metrics import Accuracy, Loss, Metric
 from ignite.utils import convert_tensor
 import json_log_plots
@@ -38,14 +37,15 @@ def main():
         help='number of data loading workers')
     arg('--lr', default=2.5e-5, type=float, help='initial learning rate')
     arg('--optimizer', default='adam')
-    arg('--epochs', default=30, type=int, help='number of total epochs to run')
+    arg('--accumulation-steps', type=int, default=1)
+    arg('--epochs', default=20, type=int, help='number of total epochs to run')
     arg('--output-dir', help='path where to save')
     arg('--resume', help='resume from checkpoint')
     arg('--test-only', help='Only test the model', action='store_true')
     arg('--submission', help='Create submission', action='store_true')
     arg('--fold', type=int, default=0)
     arg('--n-folds', type=int, default=5)
-    arg('--repeat-train', type=int, default=4)
+    arg('--repeat-train', type=int, default=6)
     arg('--train-limit', type=int)
     arg('--test-limit', type=int)
     args = parser.parse_args()
@@ -139,6 +139,7 @@ def main():
         loss_fn=lambda y_pred, y: loss(get_output(y_pred), get_labels(y)),
         device=device,
         prepare_batch=_prepare_batch,
+        accumulation_steps=args.accumulation_steps,
     )
 
     def get_y_pred_y(output):
@@ -340,6 +341,33 @@ def _top_k_entry(top_k_classes, top_k_logits, i):
         'top_k_logits': ' '.join(f'{v:.4f}' for v in top_k_logits[i]),
         'top_k_classes': ' '.join(map(str, top_k_classes[i])),
     }
+
+
+def create_supervised_trainer(
+        model, optimizer, loss_fn,
+        device=None, non_blocking=False,
+        prepare_batch=_prepare_batch,
+        output_transform=lambda x, y, y_pred, loss: loss.item(),
+        accumulation_steps: int = 1,
+        ):
+
+    def update_fn(engine, batch):
+        model.train()
+
+        if engine.state.iteration % accumulation_steps == 0:
+            optimizer.zero_grad()
+
+        x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
+        y_pred = model(x)
+        loss = loss_fn(y_pred, y)
+        loss.backward()
+
+        if engine.state.iteration % accumulation_steps == 0:
+            optimizer.step()
+
+        return output_transform(x, y, y_pred, loss)
+
+    return Engine(update_fn)
 
 
 if __name__ == '__main__':
