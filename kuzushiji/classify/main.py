@@ -111,7 +111,12 @@ def main():
     print(model)
     device = torch.device(args.device)
     model.to(device)
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    if args.optimizer == 'adam':
+        optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    elif args.optimizer == 'sgd':
+        optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
+    else:
+        parser.error(f'Unexpected optimzier {args.optimizer}')
     loss = nn.CrossEntropyLoss()
     step = epoch = 0
     best_f1 = 0
