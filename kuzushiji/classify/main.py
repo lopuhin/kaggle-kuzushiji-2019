@@ -13,6 +13,7 @@ import numpy as np
 import torch
 from torch import optim, nn
 from torch.utils.data import DataLoader
+from torch.optim.lr_scheduler import StepLR
 import tqdm
 
 from ..data_utils import (
@@ -40,6 +41,8 @@ def main():
     arg('--optimizer', default='adam')
     arg('--accumulation-steps', type=int, default=1)
     arg('--epochs', default=20, type=int, help='number of total epochs to run')
+    arg('--drop-lr-epoch', default=0, type=int,
+        help='epoch at which to drop lr')
     arg('--output-dir', help='path where to save')
     arg('--resume', help='resume from checkpoint')
     arg('--test-only', help='Only test the model', action='store_true')
@@ -270,6 +273,12 @@ def main():
                 parser.error('--output-dir required with --submission')
             make_submission()
         return
+
+    scheduler = None
+    if args.drop_lr_epoch:
+        scheduler = StepLR(optimizer, step_size=args.drop_lr_epoch, gamma=0.1)
+    if scheduler is not None:
+        trainer.on(Events.EPOCH_COMPLETED)(lambda _: scheduler.step())
 
     trainer.run(data_loader, max_epochs=epochs_left)
 
