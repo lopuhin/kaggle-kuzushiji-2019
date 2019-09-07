@@ -13,7 +13,7 @@ import numpy as np
 import torch
 from torch import optim, nn
 from torch.utils.data import DataLoader
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
 import tqdm
 
 from ..data_utils import (
@@ -43,6 +43,7 @@ def main():
     arg('--epochs', default=20, type=int, help='number of total epochs to run')
     arg('--drop-lr-epoch', default=0, type=int,
         help='epoch at which to drop lr')
+    arg('--cosine', action='store_true', help='cosine lr schedule')
     arg('--output-dir', help='path where to save')
     arg('--resume', help='resume from checkpoint')
     arg('--test-only', help='Only test the model', action='store_true')
@@ -275,8 +276,12 @@ def main():
         return
 
     scheduler = None
+    if args.drop_lr_epoch and args.cosine:
+        parser.error('Choose only one schedule')
     if args.drop_lr_epoch:
         scheduler = StepLR(optimizer, step_size=args.drop_lr_epoch, gamma=0.1)
+    if args.cosine:
+        scheduler = CosineAnnealingLR(optimizer, epochs_left)
     if scheduler is not None:
         trainer.on(Events.EPOCH_COMPLETED)(lambda _: scheduler.step())
 
