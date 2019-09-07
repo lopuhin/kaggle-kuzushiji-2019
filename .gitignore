@@ -1,5 +1,6 @@
 /data
 *.ipynb
+!*-git.ipynb
 /_runs*
 
 *.egg-info/
