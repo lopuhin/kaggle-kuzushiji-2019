@@ -36,6 +36,7 @@ def main():
     arg('--workers', default=12, type=int,
         help='number of data loading workers')
     arg('--lr', default=2.5e-5, type=float, help='initial learning rate')
+    arg('--wd', default=0, type=float, help='weight decay')
     arg('--optimizer', default='adam')
     arg('--accumulation-steps', type=int, default=1)
     arg('--epochs', default=20, type=int, help='number of total epochs to run')
@@ -113,9 +114,18 @@ def main():
     device = torch.device(args.device)
     model.to(device)
     if args.optimizer == 'adam':
-        optimizer = optim.Adam(model.parameters(), lr=args.lr)
+        optimizer = optim.Adam(
+            model.parameters(),
+            lr=args.lr,
+            weight_decay=args.wd,
+        )
     elif args.optimizer == 'sgd':
-        optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
+        optimizer = optim.SGD(
+            model.parameters(),
+            lr=args.lr,
+            weight_decay=args.wd,
+            momentum=0.9,
+        )
     else:
         parser.error(f'Unexpected optimzier {args.optimizer}')
     loss = nn.CrossEntropyLoss()
