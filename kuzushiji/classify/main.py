@@ -32,6 +32,7 @@ def main():
 
     arg('clf_gt', help='segmentation predictions')
     arg('--base', default='resnet50')
+    arg('--use-sequences', type=int, default=0)
     arg('--head-dropout', type=float, default=0)
     arg('--device', default='cuda', help='device')
     arg('--batch-size', default=12, type=int)
@@ -118,6 +119,7 @@ def main():
         base=args.base,
         n_classes=len(classes),
         head_dropout=args.head_dropout,
+        use_sequences=bool(args.use_sequences),
     )
     print(model)
     device = torch.device(args.device)

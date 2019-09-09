@@ -10,16 +10,25 @@ def build_model(base: str, n_classes: int, **kwargs) -> nn.Module:
 
 
 class Model(nn.Module):
-    def __init__(self, base: str, n_classes: int, head_dropout: float):
+    def __init__(
+            self, base: str, n_classes: int, head_dropout: float,
+            use_sequences: bool,
+            ):
         super().__init__()
         self.base = ResNetBase(base)
         self.res_l1 = 3
         self.res_l2 = 3
+        self.use_sequences = use_sequences
         self.head = Head(
             in_features=(self.base.out_features_l1 * self.res_l1 ** 2 +
                          self.base.out_features_l2 * self.res_l2 ** 2),
             n_classes=n_classes,
             dropout=head_dropout)
+        if self.use_sequences:
+            self.lstm = nn.LSTM(
+                input_size=self.head.hidden_dim,
+                hidden_size=self.head.hidden_dim // 2,
+                bidirectional=True)
 
     def forward(self, x):
         x, rois, sequences = x
@@ -40,8 +49,26 @@ class Model(nn.Module):
             [x_l1.flatten(start_dim=1),
              x_l2.flatten(start_dim=1)],
             dim=1)
-        x = self.head(x)
+        x = self.head(x, apply_fc_out=not self.use_sequences)
+        if self.use_sequences:
+            x = self._apply_lstm(x, rois, sequences)
+            x = self.head.fc2(x)
         return x, rois
+
+    def _apply_lstm(self, x, rois, sequences):
+        assert len(rois) == len(sequences)
+        assert x.shape[0] == sum(map(len, rois))
+        offset = 0
+        output = torch.zeros_like(x)
+        for item_rois, item_sequences in zip(rois, sequences):
+            assert item_rois.shape[0] == sum(map(len, item_sequences))
+            for sequence in item_sequences:
+                offset_sequence = sequence + offset
+                seq_input = x[offset_sequence]
+                seq_output, _ = self.lstm(seq_input.unsqueeze(1))
+                output[offset_sequence] = seq_output.squeeze(1)
+            offset += item_rois.shape[0]
+        return output
 
 
 def get_output(x_rois):
@@ -52,19 +79,23 @@ def get_output(x_rois):
 class Head(nn.Module):
     def __init__(self, in_features: int, n_classes: int, dropout: float):
         super().__init__()
-        hidden_dim = 1024
+        self.hidden_dim = 1024
         self.dropout = nn.Dropout(dropout) if dropout else None
-        self.fc1 = nn.Linear(in_features, hidden_dim)
-        self.bn = nn.BatchNorm1d(hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, n_classes)
+        self.fc1 = nn.Linear(in_features, self.hidden_dim)
+        self.bn = nn.BatchNorm1d(self.hidden_dim)
+        self.fc2 = nn.Linear(self.hidden_dim, n_classes)
 
-    def forward(self, x):
+    def forward(self, x, apply_fc_out=True):
         if self.dropout is not None:
             x = self.dropout(x)
         x = F.relu(self.fc1(x))
         x = self.bn(x)
-        x = self.fc2(x)
+        if apply_fc_out:
+            x = self.apply_fc_out(x)
         return x
+
+    def apply_fc_out(self, x):
+        return self.fc2(x)
 
 
 class ResNetBase(nn.Module):
