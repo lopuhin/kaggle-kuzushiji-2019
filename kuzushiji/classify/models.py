@@ -89,6 +89,8 @@ class Head(nn.Module):
         if self.dropout is not None:
             x = self.dropout(x)
         x = F.relu(self.fc1(x))
+        if self.dropout is not None:
+            x = self.dropout(x)
         x = self.bn(x)
         if apply_fc_out:
             x = self.apply_fc_out(x)
