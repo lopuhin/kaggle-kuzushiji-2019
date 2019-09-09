@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import torch.utils.data
 
-from ..data_utils import get_image_path, read_image
+from ..data_utils import get_image_path, read_image, get_sequences
 
 
 def get_transform(train: bool, normalize: bool = True) -> Callable:
@@ -57,11 +57,12 @@ def get_transform(train: bool, normalize: bool = True) -> Callable:
 
 
 def collate_fn(batch):
-    images = torch.stack([img for (img, _), _ in batch])
-    boxes = [b for (_, b), _ in batch]
-    labels = torch.cat([l for (_, _), (l, _) in batch])
-    meta = [m for (_, _), (_, m) in batch]
-    return (images, boxes), (labels, meta)
+    images = torch.stack([img for (img, _, _), _ in batch])
+    boxes = [b for (_, b, _), _ in batch]
+    sequences = [s for (_, _, s), _ in batch]
+    labels = torch.cat([l for _, (l, _) in batch])
+    meta = [m for _, (_, m) in batch]
+    return (images, boxes, sequences), (labels, meta)
 
 
 class Dataset(torch.utils.data.Dataset):
@@ -104,6 +105,7 @@ class Dataset(torch.utils.data.Dataset):
                 raise ValueError('empty bboxes not expected')
         image = xy['image']
         boxes = torch.tensor(xy['bboxes']).reshape((len(xy['bboxes']), 4))
+        sequences = [torch.tensor(seq) for seq in get_sequences(xy['bboxes'])]
         # convert to pytorch detection format
         boxes[:, 2] += boxes[:, 0]
         boxes[:, 3] += boxes[:, 1]
@@ -114,7 +116,7 @@ class Dataset(torch.utils.data.Dataset):
             'scale_h': original_h / h,
             'scale_w': original_w / w,
         }
-        return (image, boxes), (labels, meta)
+        return (image, boxes, sequences), (labels, meta)
 
 
 def get_labels(y):

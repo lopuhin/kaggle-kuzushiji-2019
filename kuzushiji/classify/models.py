@@ -22,7 +22,7 @@ class Model(nn.Module):
             dropout=head_dropout)
 
     def forward(self, x):
-        x, rois = x
+        x, rois, sequences = x
         _, _, input_h, input_w = x.shape
         x_l1, x_l2 = self.base(x)
         del x
