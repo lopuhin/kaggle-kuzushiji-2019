@@ -32,6 +32,7 @@ def main():
 
     arg('clf_gt', help='segmentation predictions')
     arg('--base', default='resnet50')
+    arg('--head-dropout', type=float, default=0)
     arg('--device', default='cuda', help='device')
     arg('--batch-size', default=12, type=int)
     arg('--workers', default=12, type=int,
@@ -113,7 +114,11 @@ def main():
         num_workers=args.workers)
 
     print('Creating model')
-    model: nn.Module = build_model(base=args.base, n_classes=len(classes))
+    model: nn.Module = build_model(
+        base=args.base,
+        n_classes=len(classes),
+        head_dropout=args.head_dropout,
+    )
     print(model)
     device = torch.device(args.device)
     model.to(device)

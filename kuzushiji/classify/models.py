@@ -5,12 +5,12 @@ from torchvision.ops import roi_align
 from torchvision import models
 
 
-def build_model(base: str, n_classes: int) -> nn.Module:
-    return Model(base=base, n_classes=n_classes)
+def build_model(base: str, n_classes: int, **kwargs) -> nn.Module:
+    return Model(base=base, n_classes=n_classes, **kwargs)
 
 
 class Model(nn.Module):
-    def __init__(self, base: str, n_classes: int):
+    def __init__(self, base: str, n_classes: int, head_dropout: float):
         super().__init__()
         self.base = ResNetBase(base)
         self.res_l1 = 3
@@ -18,7 +18,8 @@ class Model(nn.Module):
         self.head = Head(
             in_features=(self.base.out_features_l1 * self.res_l1 ** 2 +
                          self.base.out_features_l2 * self.res_l2 ** 2),
-            n_classes=n_classes)
+            n_classes=n_classes,
+            dropout=head_dropout)
 
     def forward(self, x):
         x, rois = x
@@ -49,16 +50,17 @@ def get_output(x_rois):
 
 
 class Head(nn.Module):
-    def __init__(self, in_features: int, n_classes: int):
+    def __init__(self, in_features: int, n_classes: int, dropout: float):
         super().__init__()
         hidden_dim = 1024
-        self.dropout = nn.Dropout(0.25)
+        self.dropout = nn.Dropout(dropout) if dropout else None
         self.fc1 = nn.Linear(in_features, hidden_dim)
         self.bn = nn.BatchNorm1d(hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, n_classes)
 
     def forward(self, x):
-        x = self.dropout(x)
+        if self.dropout is not None:
+            x = self.dropout(x)
         x = F.relu(self.fc1(x))
         x = self.bn(x)
         x = self.fc2(x)
