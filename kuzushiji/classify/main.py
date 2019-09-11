@@ -110,7 +110,7 @@ def main():
             scale_aug=args.scale_aug,
             color_hue_aug=args.color_hue_aug,
             color_sat_aug=args.color_sat_aug,
-            color_value_aug=args.color_value_aug,
+            color_val_aug=args.color_val_aug,
         )
 
     dataset = Dataset(
