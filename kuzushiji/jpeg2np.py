@@ -13,7 +13,7 @@ def main():
     for path in tqdm.tqdm(paths):
         np_path = get_image_np_path(path)
         if not np_path.exists():
-            image = read_image(path, use_np=False)
+            image = read_image(path)
             np.save(np_path, image)
 
 

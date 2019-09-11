@@ -49,11 +49,12 @@ def get_image_path(item, root: Path) -> Path:
     return path
 
 
-def read_image(path: Path, use_np: bool = True) -> np.ndarray:
-    if path.parent.name == 'train_images' and use_np:
-        return np.load(get_image_np_path(path))
-    else:
-        return jpeg4py.JPEG(str(path)).decode()
+def read_image(path: Path) -> np.ndarray:
+    if path.parent.name == 'train_images':
+        np_path = get_image_np_path(path)
+        if np_path.exists():
+            return np.load(np_path)
+    return jpeg4py.JPEG(str(path)).decode()
 
 
 def get_image_np_path(path):
