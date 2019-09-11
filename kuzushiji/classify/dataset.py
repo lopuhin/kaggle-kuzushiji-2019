@@ -30,8 +30,8 @@ def get_transform(
         for sign in [-1, 1])
     if train:
         transforms = [
-            A.LongestMaxSize(max_size=train_initial_size),
-            A.RandomSizedCrop(
+            LongestMaxSizeRandomSizedCrop(
+                max_size=train_initial_size,
                 min_max_height=crop_min_max_height,
                 width=crop_width,
                 height=crop_height,
@@ -63,6 +63,38 @@ def get_transform(
             'label_fields': ['labels'],
         },
     )
+
+
+class LongestMaxSizeRandomSizedCrop(A.RandomSizedCrop):
+    """ Combines LongestMaxSize and RandomSizedCrop into one transform.
+    """
+    def __init__(self, *, max_size, **kwargs):
+        super().__init__(**kwargs)
+        self.max_size = max_size
+
+    @property
+    def target_dependence(self):
+        return {'bboxes': ['image']}
+
+    def apply(self, img, crop_height=0, crop_width=0, **params):
+        crop_height, crop_width = self._crop_h_w(img, crop_height, crop_width)
+        return super().apply(
+            img=img, crop_height=crop_height, crop_width=crop_width, **params)
+
+    def apply_to_bbox(
+            self, bbox, crop_height=0, crop_width=0, image=None, **params):
+        crop_height, crop_width = self._crop_h_w(image, crop_height, crop_width)
+        return super().apply_to_bbox(
+            bbox, crop_height=crop_height, crop_width=crop_width, **params)
+
+    def _crop_h_w(self, img, crop_height, crop_width):
+        max_size = max(img.shape[:2])
+        crop_height = int(crop_height * max_size / self.max_size)
+        crop_width = int(crop_width * max_size / self.max_size)
+        return crop_height, crop_width
+
+    def get_transform_init_args_names(self):
+        return super().get_transform_init_args_names() + ('max_size',)
 
 
 def collate_fn(batch):
