@@ -42,21 +42,21 @@ def main():
     # Model params
     arg('--base', default='resnet50')
     arg('--use-sequences', type=int, default=0)
-    arg('--head-dropout', type=float, default=0)
+    arg('--head-dropout', type=float, default=0.5)
     # Training params
     arg('--device', default='cuda', help='device')
     arg('--batch-size', default=12, type=int)
     arg('--workers', default=12, type=int,
         help='number of data loading workers')
-    arg('--lr', default=2.5e-5, type=float, help='initial learning rate')
-    arg('--wd', default=0, type=float, help='weight decay')
-    arg('--optimizer', default='adam')
+    arg('--lr', default=16e-3, type=float, help='initial learning rate')
+    arg('--wd', default=1e-4, type=float, help='weight decay')
+    arg('--optimizer', default='sgd')
     arg('--accumulation-steps', type=int, default=1)
-    arg('--epochs', default=20, type=int, help='number of total epochs to run')
+    arg('--epochs', default=30, type=int, help='number of total epochs to run')
     arg('--repeat-train', type=int, default=6)
     arg('--drop-lr-epoch', default=0, type=int,
         help='epoch at which to drop lr')
-    arg('--cosine', action='store_true', help='cosine lr schedule')
+    arg('--cosine', type=int, default=0, help='cosine lr schedule')
     # Misc. params
     arg('--output-dir', help='path where to save')
     arg('--resume', help='resume from checkpoint')
