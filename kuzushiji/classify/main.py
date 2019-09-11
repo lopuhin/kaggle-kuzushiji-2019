@@ -46,7 +46,7 @@ def main():
     # Training params
     arg('--device', default='cuda', help='device')
     arg('--batch-size', default=12, type=int)
-    arg('--workers', default=12, type=int,
+    arg('--workers', default=8, type=int,
         help='number of data loading workers')
     arg('--lr', default=16e-3, type=float, help='initial learning rate')
     arg('--wd', default=1e-4, type=float, help='weight decay')
