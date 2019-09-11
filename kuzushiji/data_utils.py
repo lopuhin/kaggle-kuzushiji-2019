@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-import cv2
+import jpeg4py
 import pandas as pd
 import numpy as np
 import torch
@@ -48,9 +48,7 @@ def get_image_path(item, root: Path) -> Path:
 
 
 def read_image(path: Path) -> np.ndarray:
-    image = cv2.imread(str(path))
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    return image
+    return jpeg4py.JPEG(str(path)).decode()
 
 
 def get_target_boxes_labels(item):

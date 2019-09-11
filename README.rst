@@ -13,6 +13,9 @@ Install::
     pip install -r requirements.txt
     python setup.py develop
 
+Install libjpeg-turbo as documented at https://github.com/ajkxyz/jpeg4py
+
+
 Run
 ---
 
