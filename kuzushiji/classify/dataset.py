@@ -11,11 +11,22 @@ import torch.utils.data
 from ..data_utils import get_image_path, read_image, get_sequences
 
 
-def get_transform(train: bool, normalize: bool = True) -> Callable:
+def get_transform(
+        *,
+        train: bool,
+        test_height: int,
+        crop_width: int,
+        crop_height: int,
+        scale_aug: float,
+        color_hue_aug: int,
+        color_sat_aug: int,
+        color_value_aug: int,
+        normalize: bool = True,
+        ) -> Callable:
     train_initial_size = 3072
-    crop_min_max_height = (800, 1066)
-    crop_width = 512
-    crop_height = 768
+    crop_ratio = crop_height / test_height
+    crop_min_max_height = tuple(int(crop_ratio * (1 + sign * scale_aug))
+                                for sign in [-1, 1])
     if train:
         transforms = [
             A.LongestMaxSize(max_size=train_initial_size),
@@ -34,11 +45,8 @@ def get_transform(train: bool, normalize: bool = True) -> Callable:
             A.RandomGamma(),
         ]
     else:
-        test_size = int(train_initial_size *
-                        crop_height / np.mean(crop_min_max_height))
-        print(f'Test image max size {test_size} px')
         transforms = [
-            A.LongestMaxSize(max_size=test_size),
+            A.LongestMaxSize(max_size=test_height),
         ]
     if normalize:
         transforms.append(A.Normalize())

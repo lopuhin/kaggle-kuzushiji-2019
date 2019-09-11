@@ -31,9 +31,19 @@ def main():
     arg = parser.add_argument
 
     arg('clf_gt', help='segmentation predictions')
+    # Dataset params
+    arg('--test-height', type=int, default=2528)
+    arg('--crop-height', type=int, default=768)
+    arg('--crop-width', type=int, default=512)
+    arg('--scale-aug', type=float, default=0.14255091103965703)
+    arg('--color-hue-aug', type=int, default=7)
+    arg('--color-sat-aug', type=int, default=30)
+    arg('--color-value-aug', type=int, default=30)
+    # Model params
     arg('--base', default='resnet50')
     arg('--use-sequences', type=int, default=0)
     arg('--head-dropout', type=float, default=0)
+    # Training params
     arg('--device', default='cuda', help='device')
     arg('--batch-size', default=12, type=int)
     arg('--workers', default=12, type=int,
@@ -43,16 +53,17 @@ def main():
     arg('--optimizer', default='adam')
     arg('--accumulation-steps', type=int, default=1)
     arg('--epochs', default=20, type=int, help='number of total epochs to run')
+    arg('--repeat-train', type=int, default=6)
     arg('--drop-lr-epoch', default=0, type=int,
         help='epoch at which to drop lr')
     arg('--cosine', action='store_true', help='cosine lr schedule')
+    # Misc. params
     arg('--output-dir', help='path where to save')
     arg('--resume', help='resume from checkpoint')
     arg('--test-only', help='Only test the model', action='store_true')
     arg('--submission', help='Create submission', action='store_true')
     arg('--fold', type=int, default=0)
     arg('--n-folds', type=int, default=5)
-    arg('--repeat-train', type=int, default=6)
     arg('--train-limit', type=int)
     arg('--test-limit', type=int)
     args = parser.parse_args()
@@ -90,15 +101,27 @@ def main():
     print(f'{len(df_train):,} in train, {len(df_valid):,} in valid')
     classes = get_encoded_classes()
 
+    def _get_transform(*, train: bool):
+        return get_transform(
+            train=train,
+            test_height=args.test_height,
+            crop_width=args.crop_width,
+            crop_height=args.crop_height,
+            scale_aug=args.scale_aug,
+            color_hue_aug=args.color_hue_aug,
+            color_sat_aug=args.color_sat_aug,
+            color_value_aug=args.color_value_aug,
+        )
+
     dataset = Dataset(
         df=pd.concat([df_train] * args.repeat_train),
-        transform=get_transform(train=True),
+        transform=_get_transform(train=True),
         root=root,
         resample_empty=True,
         classes=classes)
     dataset_test = Dataset(
         df=df_valid,
-        transform=get_transform(train=False),
+        transform=_get_transform(train=False),
         root=root,
         resample_empty=False,
         classes=classes)
