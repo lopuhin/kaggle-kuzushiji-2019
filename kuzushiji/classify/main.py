@@ -38,7 +38,7 @@ def main():
     arg('--scale-aug', type=float, default=0.14255091103965703)
     arg('--color-hue-aug', type=int, default=7)
     arg('--color-sat-aug', type=int, default=30)
-    arg('--color-value-aug', type=int, default=30)
+    arg('--color-val-aug', type=int, default=30)
     # Model params
     arg('--base', default='resnet50')
     arg('--use-sequences', type=int, default=0)

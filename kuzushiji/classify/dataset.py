@@ -20,13 +20,14 @@ def get_transform(
         scale_aug: float,
         color_hue_aug: int,
         color_sat_aug: int,
-        color_value_aug: int,
+        color_val_aug: int,
         normalize: bool = True,
         ) -> Callable:
     train_initial_size = 3072
     crop_ratio = crop_height / test_height
-    crop_min_max_height = tuple(int(crop_ratio * (1 + sign * scale_aug))
-                                for sign in [-1, 1])
+    crop_min_max_height = tuple(
+        int(train_initial_size * crop_ratio * (1 + sign * scale_aug))
+        for sign in [-1, 1])
     if train:
         transforms = [
             A.LongestMaxSize(max_size=train_initial_size),
@@ -37,9 +38,9 @@ def get_transform(
                 w2h_ratio=crop_width / crop_height,
             ),
             A.HueSaturationValue(
-                hue_shift_limit=7,
-                sat_shift_limit=30,
-                val_shift_limit=30,
+                hue_shift_limit=color_hue_aug,
+                sat_shift_limit=color_sat_aug,
+                val_shift_limit=color_val_aug,
             ),
             A.RandomBrightnessContrast(),
             A.RandomGamma(),
