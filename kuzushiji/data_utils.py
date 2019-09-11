@@ -2,12 +2,14 @@ import re
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+import cv2
 import jpeg4py
 import pandas as pd
 import numpy as np
 import torch
 
 
+cv2.setNumThreads(1)
 DATA_ROOT = Path(__file__).parent.parent / 'data'
 TRAIN_ROOT = DATA_ROOT / 'train_images'
 TEST_ROOT = DATA_ROOT / 'test_images'
@@ -47,8 +49,15 @@ def get_image_path(item, root: Path) -> Path:
     return path
 
 
-def read_image(path: Path) -> np.ndarray:
-    return jpeg4py.JPEG(str(path)).decode()
+def read_image(path: Path, use_np: bool = True) -> np.ndarray:
+    if path.parent.name == 'train_images' and use_np:
+        return np.load(get_image_np_path(path))
+    else:
+        return jpeg4py.JPEG(str(path)).decode()
+
+
+def get_image_np_path(path):
+    return path.parent / f'{path.stem}.npy'
 
 
 def get_target_boxes_labels(item):

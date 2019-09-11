@@ -19,9 +19,13 @@ Install libjpeg-turbo as documented at https://github.com/ajkxyz/jpeg4py
 Run
 ---
 
-#. Prepare data for the language model::
+#. Prepare data for the language model (not used at the moment)::
 
     python -m kuzushiji.lm.dataset
+
+#. Convert images to numpy (takes about 76 GB extra on disk)::
+
+    python -m kuzushiji.jpeg2np
 
 #. Train segmentation model across all folds::
 
