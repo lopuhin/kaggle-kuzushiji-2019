@@ -57,6 +57,7 @@ def main():
     arg('--drop-lr-epoch', default=0, type=int,
         help='epoch at which to drop lr')
     arg('--cosine', type=int, default=0, help='cosine lr schedule')
+    arg('--pseudolabels', help='path to pseudolabels to be added to train')
     # Misc. params
     arg('--output-dir', help='path where to save')
     arg('--resume', help='resume from checkpoint')
@@ -95,6 +96,11 @@ def main():
             for df in [df_train_gt, df_valid_gt]]
         df_valid = df_valid[df_valid['labels'] != '']
         root = TRAIN_ROOT
+    if args.pseudolabels:
+        df_train = (
+            pd.concat([df_train,
+                       pd.read_csv(args.pseudolabels)[df_train.columns]])
+            .reset_index(drop=True))
     if args.train_limit:
         df_train = df_train.sample(n=args.train_limit, random_state=42)
     if args.test_limit:
