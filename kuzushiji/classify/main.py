@@ -19,7 +19,7 @@ import tqdm
 from ..data_utils import (
     TRAIN_ROOT, TEST_ROOT, load_train_valid_df, load_train_df, to_coco,
     SEG_FP, from_coco, get_target_boxes_labels, scaled_boxes,
-    get_encoded_classes, submission_item)
+    get_encoded_classes, submission_item, get_book_id)
 from ..utils import run_with_pbar, print_metrics, format_value
 from ..metric import score_boxes, get_metrics
 from .dataset import Dataset, get_transform, collate_fn, get_labels
@@ -42,6 +42,7 @@ def main():
     arg('--n-tta', type=int, default=1)
     arg('--pseudolabels', help='path to pseudolabels to be added to train')
     arg('--pseudolabels-oversample', type=int, default=1)
+    arg('--test-book', help='use only this book for testing and pseudolabels')
     arg('--fold', type=int, default=0)
     arg('--n-folds', type=int, default=5)
     arg('--train-limit', type=int)
@@ -100,9 +101,15 @@ def main():
         root = TRAIN_ROOT
     if args.pseudolabels:
         df_ps = pd.read_csv(args.pseudolabels)[df_train.columns]
+        if args.test_book:
+            df_ps = df_ps[df_ps['image_id'].apply(
+                lambda x: get_book_id(x) == args.test_book)]
         df_train = (
             pd.concat([df_train] + [df_ps] * args.pseudolabels_oversample)
             .reset_index(drop=True))
+    if args.test_book:
+        df_valid = df_valid[df_valid['image_id'].apply(
+            lambda x: get_book_id(x) == args.test_book)]
     if args.train_limit:
         df_train = df_train.sample(n=args.train_limit, random_state=42)
     if args.test_limit:
