@@ -298,7 +298,7 @@ def main():
             output_dir / f'submission_{output_dir.name}.csv.gz',
             index=None)
         pd.DataFrame(evaluator.state.metrics['detailed']).to_csv(
-            output_dir / 'test_detailed{args.detailed_postfix}.csv.gz',
+            output_dir / f'test_detailed{args.detailed_postfix}.csv.gz',
             index=None)
 
     @trainer.on(Events.EPOCH_COMPLETED)
