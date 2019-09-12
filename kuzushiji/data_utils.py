@@ -29,7 +29,7 @@ def load_train_df(path=DATA_ROOT / 'train.csv'):
 
 def load_train_valid_df(fold: int, n_folds: int):
     df = load_train_df()
-    df['book_id'] = df['image_id'].apply(_get_book_id)
+    df['book_id'] = df['image_id'].apply(get_book_id)
     book_ids = np.array(sorted(set(df['book_id'].values)))
     with_counts = list(zip(
         book_ids,
@@ -80,7 +80,7 @@ def get_encoded_classes() -> Dict[str, int]:
     return {cls: i for i, cls in enumerate(sorted(classes))}
 
 
-def _get_book_id(image_id):
+def get_book_id(image_id):
     book_id = re.split(r'[_-]', image_id)[0]
     m = re.search(r'^[a-z]+', book_id)
     if m:

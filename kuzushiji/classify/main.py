@@ -40,6 +40,12 @@ def main():
     arg('--color-sat-aug', type=int, default=30)
     arg('--color-val-aug', type=int, default=30)
     arg('--n-tta', type=int, default=1)
+    arg('--pseudolabels', help='path to pseudolabels to be added to train')
+    arg('--pseudolabels-oversample', type=int, default=1)
+    arg('--fold', type=int, default=0)
+    arg('--n-folds', type=int, default=5)
+    arg('--train-limit', type=int)
+    arg('--test-limit', type=int)
     # Model params
     arg('--base', default='resnet50')
     arg('--use-sequences', type=int, default=0)
@@ -58,16 +64,11 @@ def main():
     arg('--drop-lr-epoch', default=0, type=int,
         help='epoch at which to drop lr')
     arg('--cosine', type=int, default=0, help='cosine lr schedule')
-    arg('--pseudolabels', help='path to pseudolabels to be added to train')
     # Misc. params
     arg('--output-dir', help='path where to save')
     arg('--resume', help='resume from checkpoint')
     arg('--test-only', help='Only test the model', action='store_true')
     arg('--submission', help='Create submission', action='store_true')
-    arg('--fold', type=int, default=0)
-    arg('--n-folds', type=int, default=5)
-    arg('--train-limit', type=int)
-    arg('--test-limit', type=int)
     arg('--detailed-postfix', default='', help='postfix of detailed file name')
     arg('--print-model', default=1, type=int)
     args = parser.parse_args()
@@ -98,9 +99,9 @@ def main():
         df_valid = df_valid[df_valid['labels'] != '']
         root = TRAIN_ROOT
     if args.pseudolabels:
+        df_ps = pd.read_csv(args.pseudolabels)[df_train.columns]
         df_train = (
-            pd.concat([df_train,
-                       pd.read_csv(args.pseudolabels)[df_train.columns]])
+            pd.concat([df_train] + [df_ps] * args.pseudolabels_oversample)
             .reset_index(drop=True))
     if args.train_limit:
         df_train = df_train.sample(n=args.train_limit, random_state=42)
