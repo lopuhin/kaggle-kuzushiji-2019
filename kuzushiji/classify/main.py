@@ -66,6 +66,8 @@ def main():
     arg('--n-folds', type=int, default=5)
     arg('--train-limit', type=int)
     arg('--test-limit', type=int)
+    arg('--detailed-postfix', default='', help='postfix of detailed file name')
+    arg('--print-model', default=1, type=int)
     args = parser.parse_args()
     if args.test_only and args.submission:
         parser.error('pass one of --test-only and --submission')
@@ -144,7 +146,8 @@ def main():
         head_dropout=args.head_dropout,
         use_sequences=bool(args.use_sequences),
     )
-    print(model)
+    if args.print_model:
+        print(model)
     device = torch.device(args.device)
     model.to(device)
     if args.optimizer == 'adam':
@@ -254,7 +257,8 @@ def main():
         metrics.update(get_metrics(scores))
         if output_dir:
             pd.DataFrame(evaluator.state.metrics['detailed']).to_csv(
-                output_dir / 'detailed.csv.gz', index=None)
+                output_dir / f'detailed{args.detailed_postfix}.csv.gz',
+                index=None)
         return metrics
 
     def make_submission():
@@ -270,7 +274,8 @@ def main():
             output_dir / f'submission_{output_dir.name}.csv.gz',
             index=None)
         pd.DataFrame(evaluator.state.metrics['detailed']).to_csv(
-            output_dir / 'test_detailed.csv.gz', index=None)
+            output_dir / 'test_detailed{args.detailed_postfix}.csv.gz',
+            index=None)
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_validation_results(_):
