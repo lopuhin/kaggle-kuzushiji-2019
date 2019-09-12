@@ -3,6 +3,8 @@ from collections import defaultdict
 
 import pandas as pd
 
+from ..data_utils import SEG_FP
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -13,6 +15,7 @@ def main():
         help='min score gap between top and second prediction')
     arg('--max-second-score', type=float, default=10,
         help='max second prediction score')
+    arg('--drop-seg-fp', type=int, default=1)
     args = parser.parse_args()
     df = pd.read_csv(args.detailed)
 
@@ -20,7 +23,9 @@ def main():
     n_kept = 0
     for item in df.itertuples():
         top, second, *_ = map(float, item.top_k_logits.split())
-        if top - second >= args.min_gap and second <= args.max_second_score:
+        if (top - second >= args.min_gap and
+                second <= args.max_second_score and
+                (not args.drop_seg_fp or item.pred != SEG_FP)):
             n_kept += 1
             by_image_id[item.image_id].append(
                 ' '.join(map(str, [
