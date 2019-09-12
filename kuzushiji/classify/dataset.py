@@ -1,6 +1,6 @@
 import random
 from pathlib import Path
-from typing import Callable, Dict
+from typing import Callable, Dict, List
 
 import albumentations as A
 from albumentations.pytorch import ToTensor
@@ -23,7 +23,7 @@ def get_transform(
         color_val_aug: int,
         normalize: bool = True,
         ) -> Callable:
-    train_initial_size = 3072
+    train_initial_size = 3072  # this value should not matter any more?
     crop_ratio = crop_height / test_height
     crop_min_max_height = tuple(
         int(train_initial_size * crop_ratio * (1 + sign * scale_aug))
@@ -107,19 +107,23 @@ def collate_fn(batch):
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, *, df: pd.DataFrame, transform: Callable, root: Path,
-                 resample_empty: bool, classes: Dict[str, int]):
+    def __init__(
+            self, *, df: pd.DataFrame, transforms: List[Callable],
+            root: Path, resample_empty: bool, classes: Dict[str, int],
+            ):
         self.df = df
         self.root = root
-        self.transform = transform
+        self.transforms = transforms
         self.resample_empty = resample_empty
         self.classes = classes
 
     def __len__(self):
-        return len(self.df)
+        return len(self.df) * len(self.transforms)
 
     def __getitem__(self, idx):
-        item = self.df.iloc[idx]
+        item = self.df.iloc[idx // len(self.transforms)]
+        transform = self.transforms[idx % len(self.transforms)]
+        del idx
         image = read_image(get_image_path(item, self.root))
         original_h, original_w, _ = image.shape
         if item.labels:
@@ -138,7 +142,7 @@ class Dataset(torch.utils.data.Dataset):
             'bboxes': bboxes,
             'labels': [self.classes[c] for c in labels[:, 0]],
         }
-        xy = self.transform(**xy)
+        xy = transform(**xy)
         if len(xy['bboxes']) == 0:
             if self.resample_empty:
                 return self[random.randint(0, len(self) - 1)]

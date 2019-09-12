@@ -39,6 +39,7 @@ def main():
     arg('--color-hue-aug', type=int, default=7)
     arg('--color-sat-aug', type=int, default=30)
     arg('--color-val-aug', type=int, default=30)
+    arg('--n-tta', type=int, default=1)
     # Model params
     arg('--base', default='resnet50')
     arg('--use-sequences', type=int, default=0)
@@ -109,27 +110,35 @@ def main():
     print(f'{len(df_train):,} in train, {len(df_valid):,} in valid')
     classes = get_encoded_classes()
 
-    def _get_transform(*, train: bool):
-        return get_transform(
-            train=train,
-            test_height=args.test_height,
-            crop_width=args.crop_width,
-            crop_height=args.crop_height,
-            scale_aug=args.scale_aug,
-            color_hue_aug=args.color_hue_aug,
-            color_sat_aug=args.color_sat_aug,
-            color_val_aug=args.color_val_aug,
-        )
+    def _get_transforms(*, train: bool):
+        if not train and args.n_tta > 1:
+            test_heights = [
+                args.test_height * (1 + s)
+                for s in np.linspace(0, args.scale_aug, args.n_tta)]
+            print('TTA test heights:', list(map(int, test_heights)))
+        else:
+            test_heights = [args.test_height]
+        return [
+            get_transform(
+                train=train,
+                test_height=test_height,
+                crop_width=args.crop_width,
+                crop_height=args.crop_height,
+                scale_aug=args.scale_aug,
+                color_hue_aug=args.color_hue_aug,
+                color_sat_aug=args.color_sat_aug,
+                color_val_aug=args.color_val_aug,
+            ) for test_height in test_heights]
 
     dataset = Dataset(
         df=pd.concat([df_train] * args.repeat_train),
-        transform=_get_transform(train=True),
+        transforms=_get_transforms(train=True),
         root=root,
         resample_empty=True,
         classes=classes)
     dataset_test = Dataset(
         df=df_valid,
-        transform=_get_transform(train=False),
+        transforms=_get_transforms(train=False),
         root=root,
         resample_empty=False,
         classes=classes)
@@ -206,8 +215,10 @@ def main():
         metrics={
             'accuracy': Accuracy(output_transform=get_y_pred_y),
             'loss': Loss(loss, output_transform=get_y_pred_y),
-            'predictions': GetPredictions(classes),
-            'detailed': GetDetailedPrediction(classes),
+            'predictions': GetPredictions(
+                n_tta=args.n_tta, classes=classes),
+            'detailed': GetDetailedPrediction(
+                n_tta=args.n_tta, classes=classes),
         })
 
     epochs_left = args.epochs - epoch
@@ -246,8 +257,7 @@ def main():
             'accuracy': evaluator.state.metrics['accuracy'],
         }
         scores = []
-        for prediction, meta in tqdm.tqdm(
-                evaluator.state.metrics['predictions'], desc='metrics'):
+        for prediction, meta in evaluator.state.metrics['predictions']:
             item = gt_by_image_id[meta['image_id']]
             target_boxes, target_labels = get_target_boxes_labels(item)
             target_boxes = torch.from_numpy(target_boxes)
@@ -336,7 +346,26 @@ def _prepare_batch(batch, device=None, non_blocking=False):
         (convert_tensor(y, device=device, non_blocking=non_blocking), meta))
 
 
-class GetPredictions(Metric):
+class BaseGetPredictions(Metric):
+    def __init__(self, n_tta: int, *args, **kwargs):
+        self._n_tta = n_tta
+        self._tta_buffer = []
+        super().__init__(*args, **kwargs)
+
+    def reset(self):
+        self._tta_buffer.clear()
+
+    def update(self, output):
+        (y_pred, boxes), rest = output
+        self._tta_buffer.append(y_pred)
+        if len(self._tta_buffer) == self._n_tta:
+            y_pred_tta = torch.stack(self._tta_buffer).mean(dim=0)
+            self._tta_buffer.clear()
+            output_tta = (y_pred_tta, boxes), rest
+            self.update_tta(output_tta)
+
+
+class GetPredictions(BaseGetPredictions):
     def __init__(self, classes: Dict[str, int], *args, **kwargs):
         self._predictions = []
         self._classes = {idx: cls for cls, idx in classes.items()}
@@ -344,8 +373,9 @@ class GetPredictions(Metric):
 
     def reset(self):
         self._predictions.clear()
+        super().reset()
 
-    def update(self, output):
+    def update_tta(self, output):
         (y_pred, (boxes,)), (_, (meta,)) = output
         classes = [self._classes[int(idx)] for idx in y_pred.argmax(dim=1)]
         centers_x = 0.5 * (boxes[:, 0] + boxes[:, 2])
@@ -362,7 +392,7 @@ class GetPredictions(Metric):
         return self._predictions
 
 
-class GetDetailedPrediction(Metric):
+class GetDetailedPrediction(BaseGetPredictions):
     def __init__(self, classes: Dict[str, int], top_k=50, **kwargs):
         self._classes = {idx: cls for cls, idx in classes.items()}
         self._detailed = []
@@ -371,8 +401,9 @@ class GetDetailedPrediction(Metric):
 
     def reset(self):
         self._detailed.clear()
+        super().reset()
 
-    def update(self, output):
+    def update_tta(self, output):
         (y_pred_full, (boxes,)), (y, (meta,)) = output
         y_pred = y_pred_full.argmax(dim=1)
         boxes = to_coco(scaled_boxes(boxes, meta['scale_w'], meta['scale_h']))
