@@ -17,7 +17,7 @@ from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
 import tqdm
 
 from ..data_utils import (
-    TRAIN_ROOT, TEST_ROOT, load_train_valid_df, load_train_df, to_coco,
+    load_train_valid_df, load_train_df, to_coco,
     SEG_FP, from_coco, get_target_boxes_labels, scaled_boxes,
     get_encoded_classes, submission_item, get_book_id)
 from ..utils import run_with_pbar, print_metrics, format_value
@@ -40,7 +40,8 @@ def main():
     arg('--color-sat-aug', type=int, default=30)
     arg('--color-val-aug', type=int, default=30)
     arg('--n-tta', type=int, default=1)
-    arg('--pseudolabels', help='path to pseudolabels to be added to train')
+    arg('--pseudolabels', nargs='+',
+        help='path to pseudolabels to be added to train')
     arg('--pseudolabels-oversample', type=int, default=1)
     arg('--test-book', help='use only this book for testing and pseudolabels')
     arg('--fold', type=int, default=0)
@@ -92,15 +93,14 @@ def main():
         empty_index = df_valid['labels'] == ''
         empty_pages = df_valid[empty_index]['image_id'].values
         df_valid = df_valid[~empty_index]
-        root = TEST_ROOT
     else:
         df_train, df_valid = [
             df_clf_gt[df_clf_gt['image_id'].isin(set(df['image_id']))]
             for df in [df_train_gt, df_valid_gt]]
         df_valid = df_valid[df_valid['labels'] != '']
-        root = TRAIN_ROOT
     if args.pseudolabels:
-        df_ps = pd.read_csv(args.pseudolabels)[df_train.columns]
+        df_ps = pd.concat(
+            [pd.read_csv(p)[df_train.columns] for p in args.pseudolabels])
         if args.test_book:
             df_ps = df_ps[df_ps['image_id'].apply(
                 lambda x: get_book_id(x) == args.test_book)]
@@ -141,13 +141,11 @@ def main():
     dataset = Dataset(
         df=pd.concat([df_train] * args.repeat_train),
         transforms=_get_transforms(train=True),
-        root=root,
         resample_empty=True,
         classes=classes)
     dataset_test = Dataset(
         df=df_valid,
         transforms=_get_transforms(train=False),
-        root=root,
         resample_empty=False,
         classes=classes)
     data_loader = DataLoader(

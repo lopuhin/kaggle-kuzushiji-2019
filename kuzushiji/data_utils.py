@@ -43,7 +43,9 @@ def load_train_valid_df(fold: int, n_folds: int):
                  for ids in [train_book_ids, valid_book_ids])
 
 
-def get_image_path(item, root: Path) -> Path:
+def get_image_path(item, root: Path = None) -> Path:
+    if root is None:
+        root = TEST_ROOT if item.image_id.startswith('test_') else TRAIN_ROOT
     path = root / f'{item.image_id}.jpg'
     assert path.exists(), path
     return path

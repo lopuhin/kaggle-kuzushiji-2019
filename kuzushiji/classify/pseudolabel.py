@@ -15,7 +15,7 @@ def main():
         help='min score gap between top and second prediction')
     arg('--max-second-score', type=float, default=10,
         help='max second prediction score')
-    arg('--drop-seg-fp', type=int, default=1)
+    arg('--drop-seg-fp', type=int, default=0)
     args = parser.parse_args()
     df = pd.read_csv(args.detailed)
 

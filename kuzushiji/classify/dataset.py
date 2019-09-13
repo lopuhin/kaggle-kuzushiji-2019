@@ -1,5 +1,4 @@
 import random
-from pathlib import Path
 from typing import Callable, Dict, List
 
 import albumentations as A
@@ -109,10 +108,9 @@ def collate_fn(batch):
 class Dataset(torch.utils.data.Dataset):
     def __init__(
             self, *, df: pd.DataFrame, transforms: List[Callable],
-            root: Path, resample_empty: bool, classes: Dict[str, int],
+            resample_empty: bool, classes: Dict[str, int],
             ):
         self.df = df
-        self.root = root
         self.transforms = transforms
         self.resample_empty = resample_empty
         self.classes = classes
@@ -124,7 +122,7 @@ class Dataset(torch.utils.data.Dataset):
         item = self.df.iloc[idx // len(self.transforms)]
         transform = self.transforms[idx % len(self.transforms)]
         del idx
-        image = read_image(get_image_path(item, self.root))
+        image = read_image(get_image_path(item))
         original_h, original_w, _ = image.shape
         if item.labels:
             labels = np.array(item.labels.split(' ')).reshape(-1, 5)
