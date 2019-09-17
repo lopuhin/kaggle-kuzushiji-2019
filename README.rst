@@ -15,7 +15,6 @@ Install::
 
 Install libjpeg-turbo as documented at https://github.com/ajkxyz/jpeg4py
 
-
 Run
 ---
 
@@ -23,7 +22,7 @@ Run
 
     python -m kuzushiji.lm.dataset
 
-#. Convert images to numpy (takes about 76 GB extra on disk)::
+#. Convert images to numpy (takes about 76 GB extra on disk, optional)::
 
     python -m kuzushiji.jpeg2np
 
