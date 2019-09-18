@@ -109,7 +109,7 @@ def from_coco(boxes: torch.Tensor) -> torch.Tensor:
     return boxes
 
 
-def scaled_boxes(
+def scale_boxes(
         boxes: torch.Tensor, w_scale: float, h_scale: float) -> torch.Tensor:
     return torch.stack([
         boxes[:, 0] * w_scale,

@@ -18,7 +18,7 @@ import tqdm
 
 from ..data_utils import (
     load_train_valid_df, load_train_df, to_coco,
-    SEG_FP, from_coco, get_target_boxes_labels, scaled_boxes,
+    SEG_FP, from_coco, get_target_boxes_labels, scale_boxes,
     get_encoded_classes, submission_item, get_book_id)
 from ..utils import run_with_pbar, print_metrics, format_value
 from ..metric import score_boxes, get_metrics
@@ -412,7 +412,7 @@ class GetDetailedPrediction(BaseGetPredictions):
     def update_tta(self, output):
         (y_pred_full, (boxes,)), (y, (meta,)) = output
         y_pred = y_pred_full.argmax(dim=1)
-        boxes = to_coco(scaled_boxes(boxes, meta['scale_w'], meta['scale_h']))
+        boxes = to_coco(scale_boxes(boxes, meta['scale_w'], meta['scale_h']))
         assert y_pred.shape == y.shape == (boxes.shape[0],)
         top_k_classes, top_k_logits = _get_top_k(y_pred_full, self._top_k)
         for i, (box, y_pred_i, y_i) in enumerate(zip(boxes, y_pred, y)):
