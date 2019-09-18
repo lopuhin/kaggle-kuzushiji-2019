@@ -197,7 +197,7 @@ def build_model(name: str, pretrained: bool, nms_threshold: float):
             sizes=tuple((s,) for s in anchor_sizes),
             aspect_ratios=tuple((0.5, 1.0, 2.0) for _ in anchor_sizes),
         ),
-        box_detections_per_img=500,
+        box_detections_per_img=1000,
         box_nms_thresh=nms_threshold,
     )
     model.roi_heads.box_predictor = FastRCNNPredictor(
