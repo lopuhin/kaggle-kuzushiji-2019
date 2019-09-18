@@ -12,7 +12,10 @@ from .backbone_utils import resnet_fpn_backbone
 
 
 __all__ = [
-    "FasterRCNN", "fasterrcnn_resnet50_fpn",
+    "FasterRCNN",
+    "fasterrcnn_resnet50_fpn",
+    "fasterrcnn_resnet101_fpn",
+    "fasterrcnn_resnet152_fpn",
 ]
 
 
@@ -283,10 +286,22 @@ model_urls = {
 }
 
 
-def fasterrcnn_resnet50_fpn(pretrained=False, progress=True,
-                            num_classes=91, pretrained_backbone=True, **kwargs):
+def fasterrcnn_resnet50_fpn(*args, **kwargs):
+    return fasterrcnn_resnet_fpn(*args, backbone_name='resnet50', **kwargs)
+
+
+def fasterrcnn_resnet101_fpn(*args, **kwargs):
+    return fasterrcnn_resnet_fpn(*args, backbone_name='resnet101', **kwargs)
+
+
+def fasterrcnn_resnet152_fpn(*args, **kwargs):
+    return fasterrcnn_resnet_fpn(*args, backbone_name='resnet152', **kwargs)
+
+
+def fasterrcnn_resnet_fpn(backbone_name: str, pretrained=False, progress=True,
+                          num_classes=91, pretrained_backbone=True, **kwargs):
     """
-    Constructs a Faster R-CNN model with a ResNet-50-FPN backbone.
+    Constructs a Faster R-CNN model with a ResNet-FPN backbone.
 
     The input to the model is expected to be a list of tensors, each of shape ``[C, H, W]``, one for each
     image, and should be in ``0-1`` range. Different images can have different sizes.
@@ -312,7 +327,7 @@ def fasterrcnn_resnet50_fpn(pretrained=False, progress=True,
 
     Example::
 
-        >>> model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
+        >>> model = torchvision.models.detection.fasterrcnn_resnet_fpn('resnet50', pretrained=True)
         >>> model.eval()
         >>> x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
         >>> predictions = model(x)
@@ -324,10 +339,11 @@ def fasterrcnn_resnet50_fpn(pretrained=False, progress=True,
     if pretrained:
         # no need to download the backbone if pretrained is set
         pretrained_backbone = False
-    backbone = resnet_fpn_backbone('resnet50', pretrained_backbone)
+    backbone = resnet_fpn_backbone(backbone_name, pretrained_backbone)
     model = FasterRCNN(backbone, num_classes, **kwargs)
     if pretrained:
-        state_dict = load_state_dict_from_url(model_urls['fasterrcnn_resnet50_fpn_coco'],
-                                              progress=progress)
+        state_dict = load_state_dict_from_url(
+            model_urls[f'fasterrcnn_{backbone_name}_fpn_coco'],
+            progress=progress)
         model.load_state_dict(state_dict)
     return model
