@@ -9,7 +9,8 @@ import torch
 
 from . import utils
 from ..data_utils import (
-    to_coco, from_coco, get_image_path, SEG_FP, print_metrics, scaled_boxes)
+    to_coco, from_coco, get_image_path, SEG_FP, scaled_boxes)
+from ..utils import print_metrics
 from ..viz import visualize_boxes
 from ..metric import score_boxes, get_metrics
 from .dataset import get_target_boxes_labels
