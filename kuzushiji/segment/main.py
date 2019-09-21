@@ -16,6 +16,7 @@ import pandas as pd
 import torch
 import torch.utils.data
 from torch import nn
+from torch.optim.lr_scheduler import CosineAnnealingLR, MultiStepLR
 import detection
 from detection.rpn import AnchorGenerator
 from detection.transform import GeneralizedRCNNTransform
@@ -47,6 +48,8 @@ def main():
         help='decrease lr every step-size epochs')
     arg('--lr-gamma', default=0.1, type=float,
         help='decrease lr by a factor of lr-gamma')
+    arg('--cosine', type=int, default=0,
+        help='cosine lr schedule (disabled step lr schedule)')
     arg('--print-freq', default=100, type=int, help='print frequency')
     arg('--output-dir', help='path where to save')
     arg('--resume', help='resume from checkpoint')
@@ -131,14 +134,19 @@ def main():
         params, lr=args.lr, momentum=args.momentum,
         weight_decay=args.weight_decay)
 
-    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        optimizer, milestones=args.lr_steps, gamma=args.lr_gamma)
+    lr_scheduler = None
+    if args.cosine:
+        lr_scheduler = CosineAnnealingLR(optimizer, args.epochs)
+    elif args.lr_steps:
+        lr_scheduler = MultiStepLR(
+            optimizer, milestones=args.lr_steps, gamma=args.lr_gamma)
 
     if args.resume:
         checkpoint = torch.load(args.resume, map_location='cpu')
         model_without_ddp.load_state_dict(checkpoint['model'])
         optimizer.load_state_dict(checkpoint['optimizer'])
-        lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
+        if lr_scheduler:
+            lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
         print(f'Loaded from checkpoint {args.resume}')
 
     def save_eval_results(er):
@@ -166,13 +174,15 @@ def main():
         for _ in range(args.repeat_train_step):
             train_metrics = train_one_epoch(
                 model, optimizer, data_loader, device, epoch, args.print_freq)
-        lr_scheduler.step()
+        if lr_scheduler:
+            lr_scheduler.step()
         if output_dir:
             json_log_plots.write_event(output_dir, step=epoch, **train_metrics)
             utils.save_on_master({
                 'model': model_without_ddp.state_dict(),
                 'optimizer': optimizer.state_dict(),
-                'lr_scheduler': lr_scheduler.state_dict(),
+                'lr_scheduler': (
+                    lr_scheduler.state_dict() if lr_scheduler else None),
                 'args': args},
                 output_dir / f'model_last.pth')
 
