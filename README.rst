@@ -29,14 +29,16 @@ Run
 #. Train segmentation model across all folds::
 
     python -m kuzushiji.segment.main \
-        --output-dir _runs/fold0
+        --model fasterrcnn_resnet152_fpn \
+        --output-dir _runs/fold0 --fold 0
     ...
 
 #. Run it with ``--test-only`` to generate OOF ground truth for classification::
 
     python -m kuzushiji.segment.main \
         --output-dir _runs/fold0 \
-        --resume _runs/fold0/model_last.pth \
+        --model fasterrcnn_resnet152_fpn \
+        --resume _runs/fold0/model_best.pth \
         --test-only
     ...
 

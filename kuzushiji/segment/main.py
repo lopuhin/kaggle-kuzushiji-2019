@@ -42,9 +42,9 @@ def main():
     arg('--momentum', default=0.9, type=float, help='momentum')
     arg('--wd', '--weight-decay', default=1e-4, type=float,
         help='weight decay (default: 1e-4)', dest='weight_decay')
-    arg('--epochs', default=30, type=int,
+    arg('--epochs', default=45, type=int,
         help='number of total epochs to run')
-    arg('--lr-steps', default=[24, 28], nargs='+', type=int,
+    arg('--lr-steps', default=[35], nargs='+', type=int,
         help='decrease lr every step-size epochs')
     arg('--lr-gamma', default=0.1, type=float,
         help='decrease lr by a factor of lr-gamma')
@@ -55,7 +55,7 @@ def main():
     arg('--resume', help='resume from checkpoint')
     arg('--test-only', help='Only test the model', action='store_true')
     arg('--submission', help='Create test predictions', action='store_true')
-    arg('--pretrained', type=int, default=1,
+    arg('--pretrained', type=int, default=0,
         help='Use pre-trained models from the modelzoo')
     arg('--score-threshold', type=float, default=0.5)
     arg('--nms-threshold', type=float, default=0.25)
@@ -143,10 +143,13 @@ def main():
 
     if args.resume:
         checkpoint = torch.load(args.resume, map_location='cpu')
-        model_without_ddp.load_state_dict(checkpoint['model'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
-        if lr_scheduler:
-            lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
+        if 'model' in checkpint:
+            model_without_ddp.load_state_dict(checkpoint['model'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            if lr_scheduler and 'lr_scheduler' in checkpoint:
+                lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
+        else:
+            model_without_ddp.load_state_dict(checkpoint)
         print(f'Loaded from checkpoint {args.resume}')
 
     def save_eval_results(er):
@@ -167,6 +170,7 @@ def main():
         return
 
     print('Start training')
+    best_f1 = 0
     start_time = time.time()
     for epoch in range(args.epochs):
         if args.distributed:
@@ -184,7 +188,7 @@ def main():
                 'lr_scheduler': (
                     lr_scheduler.state_dict() if lr_scheduler else None),
                 'args': args},
-                output_dir / f'model_last.pth')
+                output_dir / 'checkpoint.pth')
 
         # evaluate after every epoch
         eval_metrics, eval_results = evaluate(
@@ -193,6 +197,12 @@ def main():
         save_eval_results(eval_results)
         if output_dir:
             json_log_plots.write_event(output_dir, step=epoch, **eval_metrics)
+            if eval_metrics['f1'] > best_f1:
+                best_f1 = eval_metrics['f1']
+                print(f'Updated best model with f1 of {best_f1}')
+                utils.save_on_master(
+                    model_without_ddp.state_dict(),
+                    output_dir / 'model_best.pth')
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
