@@ -25,13 +25,13 @@ def get_transform(train: bool) -> Callable:
                 height=crop_height,
                 w2h_ratio=crop_width / crop_height,
             ),
-           #A.HueSaturationValue(
-           #    hue_shift_limit=7,
-           #    sat_shift_limit=30,
-           #    val_shift_limit=30,
-           #),
-           #A.RandomBrightnessContrast(),
-           #A.RandomGamma(),
+            A.HueSaturationValue(
+                hue_shift_limit=7,
+                sat_shift_limit=10,
+                val_shift_limit=10,
+            ),
+            A.RandomBrightnessContrast(),
+            A.RandomGamma(),
         ]
     else:
         test_size = int(train_initial_size *
