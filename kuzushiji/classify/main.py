@@ -35,7 +35,7 @@ def main():
     arg('--test-height', type=int, default=2528)
     arg('--crop-height', type=int, default=768)
     arg('--crop-width', type=int, default=512)
-    arg('--scale-aug', type=float, default=0.14255091103965703)
+    arg('--scale-aug', type=float, default=0.3)
     arg('--color-hue-aug', type=int, default=7)
     arg('--color-sat-aug', type=int, default=30)
     arg('--color-val-aug', type=int, default=30)
@@ -54,18 +54,18 @@ def main():
     arg('--head-dropout', type=float, default=0.5)
     # Training params
     arg('--device', default='cuda', help='device')
-    arg('--batch-size', default=12, type=int)
+    arg('--batch-size', default=10, type=int)
     arg('--workers', default=8, type=int,
         help='number of data loading workers')
-    arg('--lr', default=16e-3, type=float, help='initial learning rate')
+    arg('--lr', default=14e-3, type=float, help='initial learning rate')
     arg('--wd', default=1e-4, type=float, help='weight decay')
     arg('--optimizer', default='sgd')
     arg('--accumulation-steps', type=int, default=1)
-    arg('--epochs', default=30, type=int, help='number of total epochs to run')
+    arg('--epochs', default=50, type=int, help='number of total epochs to run')
     arg('--repeat-train', type=int, default=6)
     arg('--drop-lr-epoch', default=0, type=int,
         help='epoch at which to drop lr')
-    arg('--cosine', type=int, default=0, help='cosine lr schedule')
+    arg('--cosine', type=int, default=1, help='cosine lr schedule')
     # Misc. params
     arg('--output-dir', help='path where to save')
     arg('--resume', help='resume from checkpoint')
