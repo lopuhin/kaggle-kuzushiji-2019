@@ -18,6 +18,8 @@ Install libjpeg-turbo as documented at https://github.com/ajkxyz/jpeg4py
 Run
 ---
 
+All steps required for submission are also in ``./run-all.sh``.
+
 #. Prepare data for the language model (not used at the moment)::
 
     python -m kuzushiji.lm.dataset
@@ -30,21 +32,21 @@ Run
 
     python -m kuzushiji.segment.main \
         --model fasterrcnn_resnet152_fpn \
-        --output-dir _runs/fold0 --fold 0
+        --output-dir _runs/segment-fold0 --fold 0
     ...
 
 #. Run it with ``--test-only`` to generate OOF ground truth for classification::
 
     python -m kuzushiji.segment.main \
-        --output-dir _runs/fold0 \
+        --output-dir _runs/segment-fold0 --fold 0 \
         --model fasterrcnn_resnet152_fpn \
-        --resume _runs/fold0/model_best.pth \
+        --resume _runs/segment-fold0/model_best.pth \
         --test-only
     ...
 
 #. Join all dataframes into one::
 
-    paths = Path('_runs').glob('fold*/clf_gt.csv')
+    paths = Path('_runs').glob('segment-fold*/clf_gt.csv')
     df = pd.concat([pd.read_csv(p) for p in paths]
     df.to_csv('_runs/clf_gt.csv')
 
@@ -57,15 +59,15 @@ Run
 #. Create test predictions from segmentation model::
 
     python -m kuzushiji.segment.main \
-        --output-dir _runs/fold0 \
-        --resume _runs/fold0/model_last.pth \
+        --output-dir _runs/segment-fold0 \
+        --resume _runs/segment-fold0/model_last.pth \
         --submission
 
 #. Create submission from classification model, using file created by the
    previous command as the first argument::
 
     python -m kuzushiji.classify.main \
-        _runs/fold0/test_predictions.csv \
+        _runs/segment-fold0/test_predictions.csv \
         --output-dir _runs/clf \
         --resume _runs/clf/model_best.pth \
         --submission

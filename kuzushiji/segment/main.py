@@ -143,7 +143,7 @@ def main():
 
     if args.resume:
         checkpoint = torch.load(args.resume, map_location='cpu')
-        if 'model' in checkpint:
+        if 'model' in checkpoint:
             model_without_ddp.load_state_dict(checkpoint['model'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             if lr_scheduler and 'lr_scheduler' in checkpoint:
