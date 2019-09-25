@@ -32,4 +32,24 @@ do
         _runs/segment_clf_gt.csv \
         --output-dir _runs/clf-fold${fold} --fold ${fold} \
         --base resnet152
+    # Check validation score
+    python -m kuzushiji.classify.main \
+        _runs/segment_clf_gt.csv \
+        --output-dir _runs/clf-fold${fold} --fold ${fold} \
+        --base resnet152 \
+        --resume _runs/clf-fold${fold}/model_best.pth \
+        --print-model 0 \
+        --n-tta 4 \
+        --test-only > _runs/clf-fold${fold}/validation.txt
+    # Create submission (sementation: check different folds, blend)
+    python -m kuzushiji.classify.main \
+        _runs/segment-fold0/test_predictions.csv \
+        --output-dir _runs/clf-fold${fold} --fold ${fold} \
+        --base resnet152 \
+        --resume _runs/clf-fold${fold}/model_best.pth \
+        --print-model 0 \
+        --n-tta 4 \
+        --submission
 done
+
+# TODO blend
