@@ -18,6 +18,7 @@ from .engine import train_one_epoch, evaluate
 
 from .import utils
 from .dataset import Dataset, get_transform
+from .blend import nms_blend
 from ..data_utils import DATA_ROOT, TRAIN_ROOT, TEST_ROOT, load_train_valid_df
 
 
@@ -236,29 +237,20 @@ class ModelBlend:
             m.eval()
 
     def __call__(self, images):
-        # based on GeneralizedRCNN.forward
-        original_image_sizes = [img.shape[-2:] for img in images]
-        model = self.models[0]
-        images, _ = model.transform(images)
-        model_predictions = []
-        all_proposals = []
-        for m in self.models:
-            features = m.backbone(images.tensors)
-            proposals, _ = m.rpn(images, features)
-            assert len(proposals) == 1
-            all_proposals.append(proposals[0])
-            model_predictions.append(m.roi_heads._forward_boxes(
-                features, proposals, images.image_sizes))
-        proposals = [torch.cat(all_proposals)]
-        class_logits = torch.cat([cl for cl, _ in model_predictions])
-        box_regression = torch.cat([br for _, br in model_predictions])
-        # based on RoIHeads.forward
-        boxes, scores, labels = model.roi_heads.postprocess_detections(
-            class_logits, box_regression, proposals, images.image_sizes)
-        detections = [dict(boxes=b, labels=l, scores=s)
-                      for b, l, s in zip(boxes, labels, scores)]
-        return model.transform.postprocess(
-            detections, images.image_sizes, original_image_sizes)
+        model_detections = [m(images)[0] for m in self.models]
+        boxes = torch.cat([x['boxes'] for x in model_detections])
+        scores = torch.cat([x['scores'] for x in model_detections])
+        boxes, scores = nms_blend(
+            boxes=boxes.cpu().numpy(),
+            scores=scores.cpu().numpy(),
+            overlap_threshold=0.75,
+            n_blended=len(self.models),
+        )
+        return [dict(
+            boxes=torch.from_numpy(boxes),
+            scores=torch.from_numpy(scores),
+            labels=torch.ones(scores.shape[0], dtype=torch.long),
+        )]
 
 
 if __name__ == '__main__':
