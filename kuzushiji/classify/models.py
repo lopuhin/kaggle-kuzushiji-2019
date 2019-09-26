@@ -18,10 +18,12 @@ class Model(nn.Module):
         self.base = ResNetBase(base)
         self.res_l1 = 3
         self.res_l2 = 3
+        self.res_l3 = 1
         self.use_sequences = use_sequences
         self.head = Head(
             in_features=(self.base.out_features_l1 * self.res_l1 ** 2 +
-                         self.base.out_features_l2 * self.res_l2 ** 2),
+                         self.base.out_features_l2 * self.res_l2 ** 2 +
+                         self.base.out_features_l3 * self.res_l3 ** 2),
             n_classes=n_classes,
             dropout=head_dropout)
         if self.use_sequences:
@@ -33,7 +35,7 @@ class Model(nn.Module):
     def forward(self, x):
         x, rois, sequences = x
         _, _, input_h, input_w = x.shape
-        x_l1, x_l2 = self.base(x)
+        x_l1, x_l2, x_l3 = self.base(x)
         del x
         x_l1 = roi_align(
             x_l1, rois,
@@ -45,9 +47,15 @@ class Model(nn.Module):
             output_size=(self.res_l2, self.res_l2),
             spatial_scale=x_l2.shape[3] / input_w,
         )
+        x_l3 = roi_align(
+            x_l3, rois,
+            output_size=(self.res_l3, self.res_l3),
+            spatial_scale=x_l3.shape[3] / input_w,
+        )
         x = torch.cat(
             [x_l1.flatten(start_dim=1),
-             x_l2.flatten(start_dim=1)],
+             x_l2.flatten(start_dim=1),
+             x_l3.flatten(start_dim=1)],
             dim=1)
         x = self.head(x, apply_fc_out=not self.use_sequences)
         if self.use_sequences:
@@ -106,6 +114,7 @@ class ResNetBase(nn.Module):
         self.base = getattr(models, name)(pretrained=True)
         self.out_features_l1 = 512
         self.out_features_l2 = 1024
+        self.out_features_l3 = 2048
 
     def forward(self, x):
         base = self.base
@@ -117,4 +126,5 @@ class ResNetBase(nn.Module):
         x_l1 = base.layer2(x)
         del x
         x_l2 = base.layer3(x_l1)
-        return x_l1, x_l2
+        x_l3 = base.layer4(x_l2)
+        return x_l1, x_l2, x_l3
