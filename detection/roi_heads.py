@@ -527,7 +527,14 @@ class RoIHeads(torch.nn.Module):
 
         return all_boxes, all_scores, all_labels
 
-    def forward(self, features, proposals, image_shapes, targets=None):
+    def _forward_boxes(self, features, proposals, image_shapes):
+        box_features = self.box_roi_pool(features, proposals, image_shapes)
+        box_features = self.box_head(box_features)
+        class_logits, box_regression = self.box_predictor(box_features)
+        return class_logits, box_regression
+
+    def forward(self, features, proposals, image_shapes, targets=None,
+                skip_postprocess=False):
         """
         Arguments:
             features (List[Tensor])
@@ -545,9 +552,7 @@ class RoIHeads(torch.nn.Module):
         if self.training:
             proposals, matched_idxs, labels, regression_targets = self.select_training_samples(proposals, targets)
 
-        box_features = self.box_roi_pool(features, proposals, image_shapes)
-        box_features = self.box_head(box_features)
-        class_logits, box_regression = self.box_predictor(box_features)
+        class_logits, box_regression = self._forward_boxes(features, proposals, image_shapes)
 
         result, losses = [], {}
         if self.training:
