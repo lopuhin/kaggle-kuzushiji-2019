@@ -187,7 +187,7 @@ def heatmaps_to_keypoints(maps, rois):
         roi_map_height = int(heights_ceil[i].item())
         width_correction = widths[i] / roi_map_width
         height_correction = heights[i] / roi_map_height
-        roi_map = torch.nn.functional.interpolate(
+        roi_map = F.interpolate(
             maps[i][None], size=(roi_map_height, roi_map_width), mode='bicubic', align_corners=False)[0]
         # roi_map_probs = scores_to_probs(roi_map.copy())
         w = roi_map.shape[2]
@@ -273,7 +273,7 @@ def expand_boxes(boxes, scale):
 def expand_masks(mask, padding):
     M = mask.shape[-1]
     scale = float(M + 2 * padding) / M
-    padded_mask = torch.nn.functional.pad(mask, (padding,) * 4)
+    padded_mask = F.pad(mask, (padding,) * 4)
     return padded_mask, scale
 
 
@@ -319,7 +319,7 @@ def paste_masks_in_image(masks, boxes, img_shape, padding=1):
     return res
 
 
-class RoIHeads(torch.nn.Module):
+class RoIHeads(nn.Module):
     def __init__(self,
                  box_roi_pool,
                  box_head,
