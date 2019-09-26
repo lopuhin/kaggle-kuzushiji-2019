@@ -11,7 +11,7 @@ from ..data_utils import get_encoded_classes, SEG_FP, submission_item, DATA_ROOT
 def main():
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
-    arg('detailed', nargs='+')
+    arg('detailed', nargs='+', help='*detailed.csv.gz files')
     arg('output')
     args = parser.parse_args()
     if Path(args.output).exists():

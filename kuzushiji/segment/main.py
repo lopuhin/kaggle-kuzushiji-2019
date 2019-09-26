@@ -1,11 +1,3 @@
-r"""PyTorch Detection Training.
-
-To run in a multi-gpu environment, use the distributed launcher::
-
-    python -m torch.distributed.launch --nproc_per_node=$NGPU --use_env \
-        main.py ... --world-size $NGPU
-
-"""
 import argparse
 import datetime
 from pathlib import Path
@@ -60,18 +52,11 @@ def main():
     arg('--score-threshold', type=float, default=0.5)
     arg('--nms-threshold', type=float, default=0.25)
     arg('--repeat-train-step', type=int, default=2)
-
-    # fold parameters
     arg('--fold', type=int, default=0)
     arg('--n-folds', type=int, default=5)
 
-    # distributed training parameters
-    arg('--world-size', default=1, type=int,
-        help='number of distributed processes')
-    arg('--dist-url', default='env://',
-        help='url used to set up distributed training')
-
     args = parser.parse_args()
+    print(args)
     if args.test_only and args.submission:
         parser.error('pass one of --test-only and --submission')
 
@@ -79,8 +64,6 @@ def main():
     if output_dir:
         output_dir.mkdir(parents=True, exist_ok=True)
 
-    utils.init_distributed_mode(args)
-    print(args)
 
     device = torch.device(args.device)
 
@@ -99,13 +82,8 @@ def main():
         df_valid, get_transform(train=False), root, skip_empty=False)
 
     print('Creating data loaders')
-    if args.distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(dataset)
-        test_sampler = \
-            torch.utils.data.distributed.DistributedSampler(dataset_test)
-    else:
-        train_sampler = torch.utils.data.RandomSampler(dataset)
-        test_sampler = torch.utils.data.SequentialSampler(dataset_test)
+    train_sampler = torch.utils.data.RandomSampler(dataset)
+    test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
     train_batch_sampler = torch.utils.data.BatchSampler(
         train_sampler, args.batch_size, drop_last=True)
@@ -123,12 +101,6 @@ def main():
     model = build_model(args.model, args.pretrained, args.nms_threshold)
     model.to(device)
 
-    model_without_ddp = model
-    if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[args.gpu])
-        model_without_ddp = model.module
-
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(
         params, lr=args.lr, momentum=args.momentum,
@@ -144,12 +116,12 @@ def main():
     if args.resume:
         checkpoint = torch.load(args.resume, map_location='cpu')
         if 'model' in checkpoint:
-            model_without_ddp.load_state_dict(checkpoint['model'])
+            model.load_state_dict(checkpoint['model'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             if lr_scheduler and 'lr_scheduler' in checkpoint:
                 lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
         else:
-            model_without_ddp.load_state_dict(checkpoint)
+            model.load_state_dict(checkpoint)
         print(f'Loaded from checkpoint {args.resume}')
 
     def save_eval_results(er):
@@ -182,8 +154,8 @@ def main():
             lr_scheduler.step()
         if output_dir:
             json_log_plots.write_event(output_dir, step=epoch, **train_metrics)
-            utils.save_on_master({
-                'model': model_without_ddp.state_dict(),
+            torch.save({
+                'model': model.state_dict(),
                 'optimizer': optimizer.state_dict(),
                 'lr_scheduler': (
                     lr_scheduler.state_dict() if lr_scheduler else None),
@@ -201,7 +173,7 @@ def main():
                 best_f1 = eval_metrics['f1']
                 print(f'Updated best model with f1 of {best_f1}')
                 utils.save_on_master(
-                    model_without_ddp.state_dict(),
+                    model.state_dict(),
                     output_dir / 'model_best.pth')
 
     total_time = time.time() - start_time
