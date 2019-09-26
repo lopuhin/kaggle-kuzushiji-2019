@@ -21,10 +21,8 @@ def nms_blend(
     y1 = boxes[:, 1]
     x2 = boxes[:, 2]
     y2 = boxes[:, 3]
-    # compute the area of the bounding boxes and sort the bounding
-    # boxes by the bottom-right y-coordinate of the bounding box
     area = (x2 - x1 + 1) * (y2 - y1 + 1)
-    idxs = np.argsort(y2)
+    idxs = np.argsort(scores)
     out_scores = np.zeros_like(scores)
     # keep looping while some indexes still remain in the indexes list
     while len(idxs) > 0:
