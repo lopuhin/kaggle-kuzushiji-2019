@@ -54,6 +54,8 @@ def main():
     arg('--repeat-train-step', type=int, default=2)
     arg('--fold', type=int, default=0)
     arg('--n-folds', type=int, default=5)
+    arg('--blend', nargs='+', help='path to other models to blend with')
+    arg('--test-limit', type=int)
 
     args = parser.parse_args()
     print(args)
@@ -63,7 +65,6 @@ def main():
     output_dir = Path(args.output_dir) if args.output_dir else None
     if output_dir:
         output_dir.mkdir(parents=True, exist_ok=True)
-
 
     device = torch.device(args.device)
 
@@ -76,6 +77,8 @@ def main():
         df_valid = pd.read_csv(DATA_ROOT / 'sample_submission.csv')
         df_valid['labels'] = ''
         root = TEST_ROOT
+    if args.test_limit:
+        df_valid = df_valid.sample(n=args.test_limit, random_state=42)
     dataset = Dataset(
         df_train, get_transform(train=True), root, skip_empty=False)
     dataset_test = Dataset(
@@ -98,8 +101,9 @@ def main():
         collate_fn=utils.collate_fn)
 
     print('Creating model')
-    model = build_model(args.model, args.pretrained, args.nms_threshold)
-    model.to(device)
+    model_builder = lambda: build_model(
+        args.model, args.pretrained, args.nms_threshold).to(device)
+    model = model_builder()
 
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(
@@ -131,6 +135,12 @@ def main():
             pd.DataFrame(clf_gt).to_csv(output_dir / 'clf_gt.csv', index=None)
 
     if args.test_only or args.submission:
+        if args.blend:
+            model = ModelBlend(
+                model=model,
+                model_builder=model_builder,
+                paths=args.blend,
+            )
         _, eval_results = evaluate(
             model, data_loader_test, device=device, output_dir=output_dir,
             threshold=args.score_threshold)
@@ -210,6 +220,45 @@ class ModelTransform(GeneralizedRCNNTransform):
 
     def resize(self, image, target):
         return image, target
+
+
+class ModelBlend:
+    def __init__(self, *, model, model_builder, paths):
+        self.models = [model]
+        for path in paths:
+            m = model_builder()
+            m.load_state_dict(torch.load(path, map_location='cpu'))
+            print(f'Loaded from checkpoint {path}')
+            self.models.append(m)
+
+    def eval(self):
+        for m in self.models:
+            m.eval()
+
+    def __call__(self, images):
+        # based on GeneralizedRCNN.forward
+        original_image_sizes = [img.shape[-2:] for img in images]
+        model = self.models[0]
+        images, _ = model.transform(images)
+        model_predictions = []
+        all_proposals = []
+        for m in self.models:
+            features = m.backbone(images.tensors)
+            proposals, _ = m.rpn(images, features)
+            assert len(proposals) == 1
+            all_proposals.append(proposals[0])
+            model_predictions.append(m.roi_heads._forward_boxes(
+                features, proposals, images.image_sizes))
+        proposals = [torch.cat(all_proposals)]
+        class_logits = torch.cat([cl for cl, _ in model_predictions])
+        box_regression = torch.cat([br for _, br in model_predictions])
+        # based on RoIHeads.forward
+        boxes, scores, labels = model.roi_heads.postprocess_detections(
+            class_logits, box_regression, proposals, images.image_sizes)
+        detections = [dict(boxes=b, labels=l, scores=s)
+                      for b, l, s in zip(boxes, labels, scores)]
+        return model.transform.postprocess(
+            detections, images.image_sizes, original_image_sizes)
 
 
 if __name__ == '__main__':
