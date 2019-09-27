@@ -54,7 +54,7 @@ do
         --print-model 0 \
         --n-tta 4 \
         --test-only > _runs/clf-fold${fold}/validation.txt
-    # Create submission (sementation: check different folds, blend)
+    # Create submission
     python -m kuzushiji.classify.main \
         _runs/segment-blend/test_predictions.csv \
         --output-dir _runs/clf-fold${fold} --fold ${fold} \
