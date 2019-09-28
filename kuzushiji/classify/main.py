@@ -139,27 +139,36 @@ def main():
                 color_val_aug=args.color_val_aug,
             ) for test_height in test_heights]
 
-    dataset = Dataset(
-        df=pd.concat([df_train] * args.repeat_train),
-        transforms=_get_transforms(train=True),
-        resample_empty=True,
-        classes=classes)
-    dataset_test = Dataset(
-        df=df_valid,
-        transforms=_get_transforms(train=False),
-        resample_empty=False,
-        classes=classes)
-    data_loader = DataLoader(
-        dataset,
-        num_workers=args.workers,
-        shuffle=True,
-        collate_fn=collate_fn,
-        batch_size=args.batch_size)
-    data_loader_test = DataLoader(
-        dataset_test,
-        batch_size=1,
-        collate_fn=collate_fn,
-        num_workers=args.workers)
+    def make_test_data_loader(df):
+        return DataLoader(
+            Dataset(
+                df=df,
+                transforms=_get_transforms(train=False),
+                resample_empty=False,
+                classes=classes,
+            ),
+            batch_size=1,
+            collate_fn=collate_fn,
+            num_workers=args.workers,
+        )
+
+    data_loader_test = make_test_data_loader(df_valid)
+    if args.dump_features:
+        df_train = df_train[df_train['labels'] != '']
+        data_loader_train = make_test_data_loader(df_train)
+    else:
+        data_loader_train = DataLoader(
+            Dataset(
+                df=pd.concat([df_train] * args.repeat_train),
+                transforms=_get_transforms(train=True),
+                resample_empty=True,
+                classes=classes,
+            ),
+            num_workers=args.workers,
+            shuffle=True,
+            collate_fn=collate_fn,
+            batch_size=args.batch_size,
+        )
 
     print('Creating model')
     model: nn.Module = build_model(
@@ -211,9 +220,10 @@ def main():
             model,
             device=device,
             prepare_batch=_prepare_batch,
-            metrics={'features': GetFeatures()},
+            metrics={'features': GetFeatures(n_tta=args.n_tta)},
         )
-        run_with_pbar(feature_evaluator, data_loader, desc='train features')
+        run_with_pbar(feature_evaluator, data_loader_train,
+                      desc='train features')
         torch.save(feature_evaluator.state.metrics['features'],
                    output_dir / 'train_features.pth')
 
@@ -230,7 +240,7 @@ def main():
             n_tta=args.n_tta, classes=classes),
     }
     if args.dump_features:
-        metrics['features'] = GetFeatures()
+        metrics['features'] = GetFeatures(n_tta=args.n_tta)
     evaluator = create_supervised_evaluator(
         model,
         device=device,
@@ -308,7 +318,7 @@ def main():
 
     epochs_left = args.epochs - epoch
     epochs_pbar = tqdm.trange(epochs_left)
-    epoch_pbar = tqdm.trange(len(data_loader))
+    epoch_pbar = tqdm.trange(len(data_loader_train))
     train_losses = deque(maxlen=20)
 
     @trainer.on(Events.ITERATION_COMPLETED)
@@ -366,7 +376,7 @@ def main():
     if scheduler is not None:
         trainer.on(Events.EPOCH_COMPLETED)(lambda _: scheduler.step())
 
-    trainer.run(data_loader, max_epochs=epochs_left)
+    trainer.run(data_loader_train, max_epochs=epochs_left)
 
 
 def _prepare_batch(batch, device=None, non_blocking=False):
@@ -394,7 +404,8 @@ class BaseGetPredictions(Metric):
         if len(self._tta_buffer_y) == self._n_tta:
             y_pred_tta = torch.stack(self._tta_buffer_y).mean(dim=0)
             y_features_tta = torch.stack(self._tta_buffer_features).mean(dim=0)
-            self.reset()
+            self._tta_buffer_y.clear()
+            self._tta_buffer_features.clear()
             output_tta = (y_pred_tta, y_features_tta, boxes), rest
             self.update_tta(output_tta)
 
@@ -407,7 +418,7 @@ class GetFeatures(BaseGetPredictions):
 
     def reset(self):
         self._features.clear()
-        self._ys.reset()
+        self._ys.clear()
         super().reset()
 
     def update_tta(self, output):
@@ -416,7 +427,7 @@ class GetFeatures(BaseGetPredictions):
         self._ys.append(y)
 
     def compute(self):
-        return torch.tensor(self._features), torch.tensor(self._ys)
+        return torch.cat(self._features), torch.cat(self._ys)
 
 
 class GetPredictions(BaseGetPredictions):

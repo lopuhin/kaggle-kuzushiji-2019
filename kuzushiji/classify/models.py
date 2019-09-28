@@ -51,8 +51,8 @@ class Model(nn.Module):
             dim=1)
         x, x_features = self.head(x)
         if self.use_sequences:
-            x = self._apply_lstm(x_features, rois, sequences)
-            x = self.head.fc2(x)
+            x_features = self._apply_lstm(x_features, rois, sequences)
+            x = self.head.apply_fc_out(x_features)
         return x, x_features, rois
 
     def _apply_lstm(self, x, rois, sequences):
@@ -85,16 +85,15 @@ class Head(nn.Module):
         self.bn = nn.BatchNorm1d(self.hidden_dim)
         self.fc2 = nn.Linear(self.hidden_dim, n_classes)
 
-    def forward(self, x, apply_fc_out=True):
+    def forward(self, x):
         if self.dropout is not None:
             x = self.dropout(x)
         x = F.relu(self.fc1(x))
         if self.dropout is not None:
             x = self.dropout(x)
-        x = self.bn(x)
-        if apply_fc_out:
-            x = self.apply_fc_out(x)
-        return x
+        x_features = self.bn(x)
+        x = self.apply_fc_out(x)
+        return x, x_features
 
     def apply_fc_out(self, x):
         return self.fc2(x)
