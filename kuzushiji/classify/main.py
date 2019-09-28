@@ -167,6 +167,7 @@ def main():
         n_classes=len(classes),
         head_dropout=args.head_dropout,
         use_sequences=bool(args.use_sequences),
+        output_features=bool(args.dump_features),
     )
     if args.print_model:
         print(model)
@@ -202,6 +203,23 @@ def main():
         else:
             model.load_state_dict(state)
         del state
+
+    if args.dump_features:
+        if not output_dir:
+            parser.error('set --output-dir with --dump-features')
+        feature_evaluator = create_supervised_evaluator(
+            model,
+            device=device,
+            prepare_batch=_prepare_batch,
+            metrics={'features': GetFeatures()},
+        )
+        run_with_pbar(feature_evaluator, data_loader_test, desc='test features')
+        torch.save(feature_evaluator.state.metrics['features'],
+                   output_dir / 'test_features.pth')
+        run_with_pbar(feature_evaluator, data_loader, desc='train features')
+        torch.save(feature_evaluator.state.metrics['features'],
+                   output_dir / 'train_features.pth')
+        return
 
     def get_y_pred_y(output):
         y_pred, y = output
@@ -370,6 +388,23 @@ class BaseGetPredictions(Metric):
             self._tta_buffer.clear()
             output_tta = (y_pred_tta, boxes), rest
             self.update_tta(output_tta)
+
+
+class GetFeatures(BaseGetPredictions):
+    def __init__(self, *args, **kwargs):
+        self._features = []
+        super().__init__(*args, **kwargs)
+
+    def reset(self):
+        self._features.clear()
+        super().reset()
+
+    def update_tta(self, output):
+        (features, (boxes,)), (y, (meta,)) = output
+        self._features.append(features)
+
+    def compute(self):
+        return torch.tensor(self._features)
 
 
 class GetPredictions(BaseGetPredictions):
