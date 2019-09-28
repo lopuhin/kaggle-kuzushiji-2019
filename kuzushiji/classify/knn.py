@@ -28,12 +28,11 @@ def main():
             rng.randint(0, test_features.shape[0], args.limit))
         test_features = test_features[index]
         test_ys = test_ys[index]
-    test_features = test_features.to(device)
 
     cos_sim = nn.CosineSimilarity().to(device)
     pred_ys = []
     for i in tqdm.trange(test_features.shape[0]):
-        feature = test_features[i].unsqueeze(0)  # .to(device)
+        feature = test_features[i].unsqueeze(0).to(device)
         sim = cos_sim(train_features, feature)
         pred_ys.append(int(train_ys[sim.argmax()]))
     pred_ys = torch.tensor(pred_ys)
