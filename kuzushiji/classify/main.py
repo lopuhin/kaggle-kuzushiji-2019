@@ -167,7 +167,6 @@ def main():
         n_classes=len(classes),
         head_dropout=args.head_dropout,
         use_sequences=bool(args.use_sequences),
-        output_features=bool(args.dump_features),
     )
     if args.print_model:
         print(model)
@@ -207,36 +206,36 @@ def main():
     if args.dump_features:
         if not output_dir:
             parser.error('set --output-dir with --dump-features')
+        # We also dump test features below
         feature_evaluator = create_supervised_evaluator(
             model,
             device=device,
             prepare_batch=_prepare_batch,
             metrics={'features': GetFeatures()},
         )
-        run_with_pbar(feature_evaluator, data_loader_test, desc='test features')
-        torch.save(feature_evaluator.state.metrics['features'],
-                   output_dir / 'test_features.pth')
         run_with_pbar(feature_evaluator, data_loader, desc='train features')
         torch.save(feature_evaluator.state.metrics['features'],
                    output_dir / 'train_features.pth')
-        return
 
     def get_y_pred_y(output):
         y_pred, y = output
         return get_output(y_pred), get_labels(y)
 
+    metrics = {
+        'accuracy': Accuracy(output_transform=get_y_pred_y),
+        'loss': Loss(loss, output_transform=get_y_pred_y),
+        'predictions': GetPredictions(
+            n_tta=args.n_tta, classes=classes),
+        'detailed': GetDetailedPrediction(
+            n_tta=args.n_tta, classes=classes),
+    }
+    if args.dump_features:
+        metrics['features'] = GetFeatures()
     evaluator = create_supervised_evaluator(
         model,
         device=device,
         prepare_batch=_prepare_batch,
-        metrics={
-            'accuracy': Accuracy(output_transform=get_y_pred_y),
-            'loss': Loss(loss, output_transform=get_y_pred_y),
-            'predictions': GetPredictions(
-                n_tta=args.n_tta, classes=classes),
-            'detailed': GetDetailedPrediction(
-                n_tta=args.n_tta, classes=classes),
-        })
+        metrics=metrics)
 
     def evaluate():
         run_with_pbar(evaluator, data_loader_test, desc='evaluate')
@@ -263,6 +262,9 @@ def main():
             pd.DataFrame(evaluator.state.metrics['detailed']).to_csv(
                 output_dir / f'detailed{args.detailed_postfix}.csv.gz',
                 index=None)
+        if args.dump_features:
+            torch.save(evaluator.state.metrics['features'],
+                       output_dir / 'test_features.pth')
         return metrics
 
     def make_submission():
@@ -280,6 +282,9 @@ def main():
         pd.DataFrame(evaluator.state.metrics['detailed']).to_csv(
             output_dir / f'test_detailed{args.detailed_postfix}.csv.gz',
             index=None)
+        if args.dump_features:
+            torch.save(evaluator.state.metrics['features'],
+                       output_dir / 'test_features.pth')
 
     if args.test_only or args.submission:
         if not args.resume:
@@ -374,37 +379,44 @@ def _prepare_batch(batch, device=None, non_blocking=False):
 class BaseGetPredictions(Metric):
     def __init__(self, n_tta: int, *args, **kwargs):
         self._n_tta = n_tta
-        self._tta_buffer = []
+        self._tta_buffer_y = []
+        self._tta_buffer_features = []
         super().__init__(*args, **kwargs)
 
     def reset(self):
-        self._tta_buffer.clear()
+        self._tta_buffer_y.clear()
+        self._tta_buffer_features.clear()
 
     def update(self, output):
-        (y_pred, boxes), rest = output
-        self._tta_buffer.append(y_pred)
-        if len(self._tta_buffer) == self._n_tta:
-            y_pred_tta = torch.stack(self._tta_buffer).mean(dim=0)
-            self._tta_buffer.clear()
-            output_tta = (y_pred_tta, boxes), rest
+        (y_pred, y_features, boxes), rest = output
+        self._tta_buffer_y.append(y_pred)
+        self._tta_buffer_features.append(y_features)
+        if len(self._tta_buffer_y) == self._n_tta:
+            y_pred_tta = torch.stack(self._tta_buffer_y).mean(dim=0)
+            y_features_tta = torch.stack(self._tta_buffer_features).mean(dim=0)
+            self.reset()
+            output_tta = (y_pred_tta, y_features_tta, boxes), rest
             self.update_tta(output_tta)
 
 
 class GetFeatures(BaseGetPredictions):
     def __init__(self, *args, **kwargs):
         self._features = []
+        self._ys = []
         super().__init__(*args, **kwargs)
 
     def reset(self):
         self._features.clear()
+        self._ys.reset()
         super().reset()
 
     def update_tta(self, output):
-        (features, (boxes,)), (y, (meta,)) = output
+        (_, features, _), (y, _) = output
         self._features.append(features)
+        self._ys.append(y)
 
     def compute(self):
-        return torch.tensor(self._features)
+        return torch.tensor(self._features), torch.tensor(self._ys)
 
 
 class GetPredictions(BaseGetPredictions):
@@ -418,7 +430,7 @@ class GetPredictions(BaseGetPredictions):
         super().reset()
 
     def update_tta(self, output):
-        (y_pred, (boxes,)), (_, (meta,)) = output
+        (y_pred, _, (boxes,)), (_, (meta,)) = output
         classes = [self._classes[int(idx)] for idx in y_pred.argmax(dim=1)]
         centers_x = 0.5 * (boxes[:, 0] + boxes[:, 2])
         centers_y = 0.5 * (boxes[:, 1] + boxes[:, 3])
@@ -446,7 +458,7 @@ class GetDetailedPrediction(BaseGetPredictions):
         super().reset()
 
     def update_tta(self, output):
-        (y_pred_full, (boxes,)), (y, (meta,)) = output
+        (y_pred_full, _, (boxes,)), (y, (meta,)) = output
         y_pred = y_pred_full.argmax(dim=1)
         boxes = to_coco(scale_boxes(boxes, meta['scale_w'], meta['scale_h']))
         assert y_pred.shape == y.shape == (boxes.shape[0],)

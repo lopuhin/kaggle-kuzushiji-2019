@@ -12,16 +12,13 @@ def build_model(base: str, n_classes: int, **kwargs) -> nn.Module:
 class Model(nn.Module):
     def __init__(
             self, base: str, n_classes: int, head_dropout: float,
-            use_sequences: bool, output_features: bool,
+            use_sequences: bool,
             ):
         super().__init__()
         self.base = ResNetBase(base)
         self.res_l1 = 3
         self.res_l2 = 3
-        if use_sequences and output_features:
-            raise ValueError
         self.use_sequences = use_sequences
-        self.output_features = output_features
         self.head = Head(
             in_features=(self.base.out_features_l1 * self.res_l1 ** 2 +
                          self.base.out_features_l2 * self.res_l2 ** 2),
@@ -52,14 +49,11 @@ class Model(nn.Module):
             [x_l1.flatten(start_dim=1),
              x_l2.flatten(start_dim=1)],
             dim=1)
-        apply_fc_out = not (self.use_sequences or self.output_features)
-        x = self.head(x, apply_fc_out=apply_fc_out)
-        if self.output_features:
-            return x, rois
+        x, x_features = self.head(x)
         if self.use_sequences:
-            x = self._apply_lstm(x, rois, sequences)
+            x = self._apply_lstm(x_features, rois, sequences)
             x = self.head.fc2(x)
-        return x, rois
+        return x, x_features, rois
 
     def _apply_lstm(self, x, rois, sequences):
         assert len(rois) == len(sequences)
@@ -78,7 +72,7 @@ class Model(nn.Module):
 
 
 def get_output(x_rois):
-    x, rois = x_rois
+    x, x_features, rois = x_rois
     return x
 
 
