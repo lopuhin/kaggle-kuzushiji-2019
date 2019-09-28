@@ -73,6 +73,7 @@ def main():
     arg('--submission', help='Create submission', action='store_true')
     arg('--detailed-postfix', default='', help='postfix of detailed file name')
     arg('--print-model', default=1, type=int)
+    arg('--dump-features', default=0, type=int)
     args = parser.parse_args()
     if args.test_only and args.submission:
         parser.error('pass one of --test-only and --submission')
@@ -202,14 +203,6 @@ def main():
             model.load_state_dict(state)
         del state
 
-    trainer = create_supervised_trainer(
-        model, optimizer,
-        loss_fn=lambda y_pred, y: loss(get_output(y_pred), get_labels(y)),
-        device=device,
-        prepare_batch=_prepare_batch,
-        accumulation_steps=args.accumulation_steps,
-    )
-
     def get_y_pred_y(output):
         y_pred, y = output
         return get_output(y_pred), get_labels(y)
@@ -226,35 +219,6 @@ def main():
             'detailed': GetDetailedPrediction(
                 n_tta=args.n_tta, classes=classes),
         })
-
-    epochs_left = args.epochs - epoch
-    epochs_pbar = tqdm.trange(epochs_left)
-    epoch_pbar = tqdm.trange(len(data_loader))
-    train_losses = deque(maxlen=20)
-
-    @trainer.on(Events.ITERATION_COMPLETED)
-    def log_training_loss(_):
-        nonlocal step
-        train_losses.append(trainer.state.output)
-        smoothed_loss = np.mean(train_losses)
-        epoch_pbar.set_postfix(loss=f'{smoothed_loss:.4f}')
-        epoch_pbar.update(1)
-        step += 1
-        if step % 20 == 0 and output_dir:
-            json_log_plots.write_event(
-                output_dir, step=step * args.batch_size,
-                loss=smoothed_loss)
-
-    @trainer.on(Events.EPOCH_COMPLETED)
-    def checkpoint(_):
-        if output_dir:
-            torch.save({
-                'model': model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'step': step,
-                'epoch': epoch,
-                'best_f1': best_f1,
-            }, output_dir / 'checkpoint.pth')
 
     def evaluate():
         run_with_pbar(evaluator, data_loader_test, desc='evaluate')
@@ -299,6 +263,55 @@ def main():
             output_dir / f'test_detailed{args.detailed_postfix}.csv.gz',
             index=None)
 
+    if args.test_only or args.submission:
+        if not args.resume:
+            parser.error('please pass --resume when running with --test-only '
+                         'or --submission')
+        if args.test_only:
+            print_metrics(evaluate())
+        elif args.submission:
+            if not output_dir:
+                parser.error('--output-dir required with --submission')
+            make_submission()
+        return
+
+    trainer = create_supervised_trainer(
+        model, optimizer,
+        loss_fn=lambda y_pred, y: loss(get_output(y_pred), get_labels(y)),
+        device=device,
+        prepare_batch=_prepare_batch,
+        accumulation_steps=args.accumulation_steps,
+    )
+
+    epochs_left = args.epochs - epoch
+    epochs_pbar = tqdm.trange(epochs_left)
+    epoch_pbar = tqdm.trange(len(data_loader))
+    train_losses = deque(maxlen=20)
+
+    @trainer.on(Events.ITERATION_COMPLETED)
+    def log_training_loss(_):
+        nonlocal step
+        train_losses.append(trainer.state.output)
+        smoothed_loss = np.mean(train_losses)
+        epoch_pbar.set_postfix(loss=f'{smoothed_loss:.4f}')
+        epoch_pbar.update(1)
+        step += 1
+        if step % 20 == 0 and output_dir:
+            json_log_plots.write_event(
+                output_dir, step=step * args.batch_size,
+                loss=smoothed_loss)
+
+    @trainer.on(Events.EPOCH_COMPLETED)
+    def checkpoint(_):
+        if output_dir:
+            torch.save({
+                'model': model.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'step': step,
+                'epoch': epoch,
+                'best_f1': best_f1,
+            }, output_dir / 'checkpoint.pth')
+
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_validation_results(_):
         nonlocal best_f1
@@ -319,18 +332,6 @@ def main():
         epochs_pbar.update(1)
         epoch_pbar.reset()
         epoch += 1
-
-    if args.test_only or args.submission:
-        if not args.resume:
-            parser.error('please pass --resume when running with --test-only '
-                         'or --submission')
-        if args.test_only:
-            print_metrics(evaluate())
-        elif args.submission:
-            if not output_dir:
-                parser.error('--output-dir required with --submission')
-            make_submission()
-        return
 
     scheduler = None
     if args.drop_lr_epoch and args.cosine:
