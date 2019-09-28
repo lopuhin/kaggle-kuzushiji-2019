@@ -92,7 +92,7 @@ class Head(nn.Module):
         if self.dropout is not None:
             x = self.dropout(x)
         x_features = self.bn(x)
-        x = self.apply_fc_out(x)
+        x = self.apply_fc_out(x_features)
         return x, x_features
 
     def apply_fc_out(self, x):

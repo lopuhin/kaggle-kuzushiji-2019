@@ -399,8 +399,9 @@ class BaseGetPredictions(Metric):
 
     def update(self, output):
         (y_pred, y_features, boxes), rest = output
-        self._tta_buffer_y.append(y_pred)
-        self._tta_buffer_features.append(y_features)
+        self._tta_buffer_y.append(y_pred.cpu())
+        self._tta_buffer_features.append(y_features.detach().cpu())
+        torch.cuda.empty_cache()
         if len(self._tta_buffer_y) == self._n_tta:
             y_pred_tta = torch.stack(self._tta_buffer_y).mean(dim=0)
             y_features_tta = torch.stack(self._tta_buffer_features).mean(dim=0)
