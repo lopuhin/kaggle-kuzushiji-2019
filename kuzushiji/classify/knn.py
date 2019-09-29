@@ -15,6 +15,7 @@ def main():
     arg('clf_folder')
     arg('--device', default='cuda')
     arg('--limit', type=int, help='evaluate only on some pages')
+    arg('--fp16', type=int, default=1)
     args = parser.parse_args()
 
     clf_folder = Path(args.clf_folder)
@@ -38,6 +39,10 @@ def main():
     eps = 1e-9
     train_features /= eps + torch.norm(train_features, dim=1).unsqueeze(1)
     test_features /= eps + torch.norm(test_features, dim=1).unsqueeze(1)
+
+    if args.fp16:
+        train_features = train_features.half()
+        test_features = test_features.half()
 
     pred_ys = []
     for i in tqdm.trange(test_features.shape[0]):
