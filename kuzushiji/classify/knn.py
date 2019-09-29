@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 import tqdm
 
-from ..data_utils import load_train_df
+from ..data_utils import load_train_df, SEG_FP
 
 
 def main():
@@ -51,6 +51,36 @@ def main():
         pred_ys.append(int(train_ys[sim.argmax()]))
     pred_ys = torch.tensor(pred_ys)
     print(f'accuracy:  {(pred_ys == test_ys).float().mean():.4f}')
+
+    # fn from missing detections missed by the segmentation model
+    fn_segmentation = (
+        sum(len(label.split()) // 5 for label in df_train['label'].values) -
+        len(df_detailed))
+    clf_metrics = get_metrics(
+        true=df_detailed['true'],
+        pred=df_detailed['pred'],
+        seg_fp=SEG_FP,
+        fn_segmentation=fn_segmentation)
+    print('clf', clf_metrics)
+    # TODO knn metrics
+
+
+def get_metrics(true, pred, seg_fp, fn_segmentation):
+    tp = ((true != 'seg_fp') & (pred == true)).sum()
+    fp = ((true == 'seg_fp') &
+          (pred != 'sef_fp')).sum()
+    fn = ((true != 'seg_fp') &
+          (pred == 'sef_fp')).sum() + fn_segmentation
+    if (tp + fp) == 0 or (tp + fn) == 0:
+        f1 = 0
+    else:
+        precision = tp / (tp + fp)
+        recall = tp / (tp + fn)
+        if precision > 0 and recall > 0:
+            f1 = (2 * precision * recall) / (precision + recall)
+        else:
+            f1 = 0
+    return {'f1': float(f1), 'tp': tp, 'fp': fp, 'fn': fn}
 
 
 if __name__ == '__main__':
