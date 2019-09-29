@@ -37,8 +37,8 @@ def main():
     df_train = df_train[df_train['image_id'].isin(image_ids)]
 
     eps = 1e-9
-    train_features /= eps + torch.norm(train_features, dim=1).unsqueeze(1)
-    test_features /= eps + torch.norm(test_features, dim=1).unsqueeze(1)
+    train_features /= torch.norm(train_features, dim=1).unsqueeze(1) + eps
+    test_features /= torch.norm(test_features, dim=1).unsqueeze(1) + eps
 
     if args.fp16:
         train_features = train_features.half()
