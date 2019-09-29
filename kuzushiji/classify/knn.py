@@ -53,8 +53,7 @@ def main():
         feature = test_features[i].unsqueeze(1).to(device)
         sim = torch.mm(train_features, feature).squeeze()
         pred_ys.append(int(train_ys[sim.argmax()]))
-    pred_ys = torch.tensor(pred_ys)
-    print(f'accuracy:  {(pred_ys == test_ys).float().mean():.4f}')
+    pred_ys = np.array(pred_ys)
 
     # fn from missing detections missed by the segmentation model
     fn_segmentation = (
@@ -79,6 +78,7 @@ def main():
 
 
 def get_metrics(true, pred, seg_fp, fn_segmentation):
+    accuracy = (true == pred).mean()
     tp = ((true != 'seg_fp') & (pred == true)).sum()
     fp = ((true == 'seg_fp') &
           (pred != 'sef_fp')).sum()
@@ -93,7 +93,13 @@ def get_metrics(true, pred, seg_fp, fn_segmentation):
             f1 = (2 * precision * recall) / (precision + recall)
         else:
             f1 = 0
-    return {'f1': float(f1), 'tp': tp, 'fp': fp, 'fn': fn}
+    return {
+        'f1': float(f1),
+        'tp': tp,
+        'fp': fp,
+        'fn': fn,
+        'accuracy': float(accuracy),
+    }
 
 
 if __name__ == '__main__':
