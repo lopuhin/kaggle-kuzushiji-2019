@@ -52,6 +52,7 @@ def main():
     for i in tqdm.trange(test_features.shape[0]):
         feature = test_features[i].unsqueeze(1).to(device)
         sim = torch.mm(train_features, feature).squeeze()
+        # TODO: if sim is too low, output seg_fp, check best threshold
         pred_ys.append(int(train_ys[sim.argmax()]))
     pred_ys = np.array(pred_ys)
 
