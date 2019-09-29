@@ -6,7 +6,8 @@ import pandas as pd
 import torch
 import tqdm
 
-from ..data_utils import load_train_df, SEG_FP
+from ..data_utils import load_train_df, SEG_FP, get_encoded_classes
+from ..utils import print_metrics
 
 
 def main():
@@ -44,6 +45,9 @@ def main():
         train_features = train_features.half()
         test_features = test_features.half()
 
+    classes = get_encoded_classes()
+    seg_fp_id = classes[SEG_FP]
+
     pred_ys = []
     for i in tqdm.trange(test_features.shape[0]):
         feature = test_features[i].unsqueeze(1).to(device)
@@ -57,12 +61,21 @@ def main():
         sum(len(label.split()) // 5 for label in df_train['label'].values) -
         len(df_detailed))
     clf_metrics = get_metrics(
-        true=df_detailed['true'],
-        pred=df_detailed['pred'],
+        true=df_detailed['true'].values,
+        pred=df_detailed['pred'].values,
         seg_fp=SEG_FP,
         fn_segmentation=fn_segmentation)
-    print('clf', clf_metrics)
-    # TODO knn metrics
+    print('clf')
+    print_metrics(clf_metrics)
+
+    knn_metrics = get_metrics(
+        true=df_detailed['true'].values,
+        pred=pred_ys,
+        seg_fp=seg_fp_id,
+        fn_segmentation=fn_segmentation)
+    print('knn')
+    print_metrics(knn_metrics)
+
 
 
 def get_metrics(true, pred, seg_fp, fn_segmentation):
