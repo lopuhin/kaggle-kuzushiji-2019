@@ -4,7 +4,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-from torch import nn
 import tqdm
 
 from ..data_utils import load_train_df
@@ -36,11 +35,14 @@ def main():
         test_ys = test_ys[index]
     df_train = df_train[df_train['image_id'].isin(image_ids)]
 
-    cos_sim = nn.CosineSimilarity().to(device)
+    eps = 1e-9
+    train_features /= eps + torch.norm(train_features, dim=1).unsqueeze(1)
+    test_features /= eps + torch.norm(test_features, dim=1).unsqueeze(1)
+
     pred_ys = []
     for i in tqdm.trange(test_features.shape[0]):
-        feature = test_features[i].unsqueeze(0).to(device)
-        sim = cos_sim(train_features, feature)
+        feature = test_features[i].unsqueeze(1).to(device)
+        sim = torch.mm(train_features, feature).squeeze()
         pred_ys.append(int(train_ys[sim.argmax()]))
     pred_ys = torch.tensor(pred_ys)
     print(f'accuracy:  {(pred_ys == test_ys).float().mean():.4f}')
