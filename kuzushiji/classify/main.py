@@ -212,7 +212,7 @@ def main():
             model.load_state_dict(state)
         del state
 
-    if args.dump_features:
+    if args.dump_features and not args.submission:
         if not output_dir:
             parser.error('set --output-dir with --dump-features')
         # We also dump test features below
@@ -273,8 +273,9 @@ def main():
                 output_dir / f'detailed{args.detailed_postfix}.csv.gz',
                 index=None)
         if args.dump_features:
+            f_name = 'test' if args.submission else 'valid'
             torch.save(evaluator.state.metrics['features'],
-                       output_dir / 'test_features.pth')
+                       output_dir / f'{f_name}_features.pth')
         return metrics
 
     def make_submission():
