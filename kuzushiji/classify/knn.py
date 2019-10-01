@@ -20,6 +20,7 @@ def main():
     arg('--fp16', type=int, default=1)
     arg('--check-thresholds', type=int)
     arg('--threshold', type=float, default=0.0)
+    arg('--zero-seg-fp', type=int, default=0)
     args = parser.parse_args()
 
     clf_folder = Path(args.clf_folder)
@@ -65,14 +66,16 @@ def main():
     seg_fp_id = classes[SEG_FP]
     thresholds = {args.threshold}
     if args.check_thresholds:
-        thresholds.update(
-            np.linspace(0, 1, args.check_thresholds, endpoint=False))
+        thresholds.update(np.linspace(0.5, 0.9, args.check_thresholds))
     thresholds = sorted(thresholds)
 
     pred_ys_by_threshold = defaultdict(list)
+    train_seg_fp_mask = train_ys == seg_fp_id
     for i in tqdm.trange(test_features.shape[0]):
         feature = test_features[i].unsqueeze(1).to(device)
         sim = torch.mm(train_features, feature).squeeze()
+        if args.zero_seg_fp:
+            sim[train_seg_fp_mask] = 0
         max_idx = sim.argmax()
         max_sim = sim[max_idx]
         cls = train_ys[max_idx]
