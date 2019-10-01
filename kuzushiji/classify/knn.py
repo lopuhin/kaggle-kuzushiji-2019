@@ -82,10 +82,12 @@ def main():
             pred_ys_by_threshold[th].append(th_cls)
     pred_ys_by_threshold = {
         th: np.array(pred_ys) for th, pred_ys in pred_ys_by_threshold.items()}
+
     if args.submission:
         pred_ys = pred_ys_by_threshold[args.threshold]
         cls_by_id = {id: cls for cls, id in classes.items()}
         df_detailed['pred'] = [cls_by_id[id] for id in pred_ys]
+        # TODO update top_k_classes and top_k_logits for the blend
         df_detailed.to_csv(clf_folder / 'test_detailed_features.csv.gz',
                            index=None)
         return
