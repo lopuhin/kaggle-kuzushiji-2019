@@ -49,6 +49,18 @@ def main():
         train_features = train_features.half()
         test_features = test_features.half()
 
+    # fn from missing detections missed by the segmentation model
+    fn_segmentation = (
+        sum(len(label.split()) // 5 for label in df_train['labels'].values) -
+        len(df_detailed))
+    clf_metrics = get_metrics(
+        true=df_detailed['true'].values,
+        pred=df_detailed['pred'].values,
+        seg_fp=SEG_FP,
+        fn_segmentation=fn_segmentation)
+    print('clf baseline')
+    print_metrics(clf_metrics)
+
     classes = get_encoded_classes()
     seg_fp_id = classes[SEG_FP]
     thresholds = {args.threshold}
@@ -72,18 +84,6 @@ def main():
             pred_ys_by_threshold[th].append(th_cls)
     pred_ys_by_threshold = {
         th: np.array(pred_ys) for th, pred_ys in pred_ys_by_threshold.items()}
-
-    # fn from missing detections missed by the segmentation model
-    fn_segmentation = (
-        sum(len(label.split()) // 5 for label in df_train['labels'].values) -
-        len(df_detailed))
-    clf_metrics = get_metrics(
-        true=df_detailed['true'].values,
-        pred=df_detailed['pred'].values,
-        seg_fp=SEG_FP,
-        fn_segmentation=fn_segmentation)
-    print('clf baseline')
-    print_metrics(clf_metrics)
 
     true_ids = np.array([classes[cls] for cls in df_detailed['true'].values])
     for th, pred_ys in sorted(pred_ys_by_threshold.items()):
