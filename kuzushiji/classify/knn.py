@@ -39,6 +39,7 @@ def main():
         test_features = test_features[index]
         test_ys = test_ys[index]
     df_train = df_train[df_train['image_id'].isin(image_ids)]
+    df_detailed = df_detailed[df_detailed['image_id'].isin(image_ids)]
 
     eps = 1e-9
     train_features /= torch.norm(train_features, dim=1).unsqueeze(1) + eps
@@ -67,14 +68,14 @@ def main():
             th_cls = cls
             # TODO maybe also separate threshold for seg_fp?
             if max_sim < th:
-                th_cls = seg_fp
+                th_cls = seg_fp_id
             pred_ys_by_threshold[th].append(th_cls)
     pred_ys_by_threshold = {
         th: np.array(pred_ys) for th, pred_ys in pred_ys_by_threshold.items()}
 
     # fn from missing detections missed by the segmentation model
     fn_segmentation = (
-        sum(len(label.split()) // 5 for label in df_train['label'].values) -
+        sum(len(label.split()) // 5 for label in df_train['labels'].values) -
         len(df_detailed))
     clf_metrics = get_metrics(
         true=df_detailed['true'].values,
@@ -85,9 +86,10 @@ def main():
     print_metrics(clf_metrics)
     print()
 
-    for th in thresholds:
+    true_ids = np.array([classes[cls] for cls in df_detailed['true'].values])
+    for th, pred_ys in sorted(pred_ys_by_threshold.items()):
         knn_metrics = get_metrics(
-            true=df_detailed['true'].values,
+            true=true_ids,
             pred=pred_ys,
             seg_fp=seg_fp_id,
             fn_segmentation=fn_segmentation)
@@ -99,8 +101,8 @@ def main():
 def get_metrics(true, pred, seg_fp, fn_segmentation):
     accuracy = (true == pred).mean()
     tp = ((true != seg_fp) & (pred == true)).sum()
-    fp = ((true == seg_fp) & (pred != sef_fp)).sum()
-    fn = ((true != seg_fp) & (pred == sef_fp)).sum() + fn_segmentation
+    fp = ((pred != seg_fp) & (pred != true)).sum()
+    fn = ((true != seg_fp) & (pred != true)).sum() + fn_segmentation
     seg_fp_ratio = (pred == seg_fp).mean()
     if (tp + fp) == 0 or (tp + fn) == 0:
         f1 = 0
