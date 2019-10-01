@@ -84,7 +84,6 @@ def main():
         fn_segmentation=fn_segmentation)
     print('clf baseline')
     print_metrics(clf_metrics)
-    print()
 
     true_ids = np.array([classes[cls] for cls in df_detailed['true'].values])
     for th, pred_ys in sorted(pred_ys_by_threshold.items()):
@@ -95,7 +94,6 @@ def main():
             fn_segmentation=fn_segmentation)
         print(f'knn at threshold={th:.3f}')
         print_metrics(knn_metrics)
-        print()
 
 
 def get_metrics(true, pred, seg_fp, fn_segmentation):

@@ -12,8 +12,7 @@ def run_with_pbar(engine, loader, desc=None):
 
 
 def print_metrics(metrics: Dict):
-    for k, v in metrics.items():
-        print(f'{k}: {format_value(v)}')
+    print(' '.join(f'{k}={format_value(v)}' for k, v in metrics.items()))
 
 
 def format_value(v):
