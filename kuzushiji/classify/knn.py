@@ -21,25 +21,32 @@ def main():
     arg('--check-thresholds', type=int)
     arg('--threshold', type=float, default=0.0)
     arg('--zero-seg-fp', type=int, default=0)
+    arg('--submission', action='store_true')
     args = parser.parse_args()
 
     clf_folder = Path(args.clf_folder)
     device = torch.device(args.device)
     train_features, train_ys = torch.load(
         clf_folder / 'train_features.pth', map_location='cpu')
-    test_features, test_ys = torch.load(
-        clf_folder / 'test_features.pth', map_location='cpu')
+    if args.submission:
+        test_features, _ = torch.load(
+            clf_folder / 'test_features.pth', map_location='cpu')
+    else:
+        test_features, test_ys = torch.load(
+            clf_folder / 'valid_features.pth', map_location='cpu')
     train_features = train_features.to(device)
-    df_detailed = pd.read_csv(clf_folder / 'detailed.csv.gz')
-    df_train = load_train_df()
+    if args.submission:
+        df_detailed = pd.read_csv(clf_folder / 'test_detailed.csv.gz')
+    else:
+        df_detailed = pd.read_csv(clf_folder / 'detailed.csv.gz')
     image_ids = sorted(set(df_detailed['image_id'].values))
     if args.limit:
         rng = np.random.RandomState(42)
         image_ids = rng.choice(image_ids, args.limit)
         index = torch.tensor(df_detailed['image_id'].isin(image_ids).values)
         test_features = test_features[index]
-        test_ys = test_ys[index]
-    df_train = df_train[df_train['image_id'].isin(image_ids)]
+        if not args.submission:
+            test_ys = test_ys[index]
     df_detailed = df_detailed[df_detailed['image_id'].isin(image_ids)]
 
     eps = 1e-9
@@ -49,18 +56,6 @@ def main():
     if args.fp16:
         train_features = train_features.half()
         test_features = test_features.half()
-
-    # fn from missing detections missed by the segmentation model
-    fn_segmentation = (
-        sum(len(label.split()) // 5 for label in df_train['labels'].values) -
-        len(df_detailed))
-    clf_metrics = get_metrics(
-        true=df_detailed['true'].values,
-        pred=df_detailed['pred'].values,
-        seg_fp=SEG_FP,
-        fn_segmentation=fn_segmentation)
-    print('clf baseline')
-    print_metrics(clf_metrics)
 
     classes = get_encoded_classes()
     seg_fp_id = classes[SEG_FP]
@@ -87,6 +82,27 @@ def main():
             pred_ys_by_threshold[th].append(th_cls)
     pred_ys_by_threshold = {
         th: np.array(pred_ys) for th, pred_ys in pred_ys_by_threshold.items()}
+    if args.submission:
+        pred_ys = pred_ys_by_threshold[args.threshold]
+        cls_by_id = {id: cls for cls, id in classes.items()}
+        df_detailed['pred'] = [cls_by_id[id] for id in pred_ys]
+        df_detailed.to_csv(clf_folder / 'test_detailed_features.csv.gz',
+                           index=None)
+        return
+
+    df_train = load_train_df()
+    df_train = df_train[df_train['image_id'].isin(image_ids)]
+    # fn from missing detections missed by the segmentation model
+    fn_segmentation = (
+        sum(len(label.split()) // 5 for label in df_train['labels'].values) -
+        len(df_detailed))
+    clf_metrics = get_metrics(
+        true=df_detailed['true'].values,
+        pred=df_detailed['pred'].values,
+        seg_fp=SEG_FP,
+        fn_segmentation=fn_segmentation)
+    print('clf baseline')
+    print_metrics(clf_metrics)
 
     true_ids = np.array([classes[cls] for cls in df_detailed['true'].values])
     for th, pred_ys in sorted(pred_ys_by_threshold.items()):
