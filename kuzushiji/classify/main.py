@@ -54,6 +54,7 @@ def main():
     arg('--head-dropout', type=float, default=0.5)
     # Training params
     arg('--device', default='cuda', help='device')
+    arg('--opt-level', help='pass 01 to use fp16 training with apex')
     arg('--batch-size', default=10, type=int)
     arg('--workers', default=8, type=int,
         help='number of data loading workers')
@@ -196,6 +197,11 @@ def main():
         )
     else:
         parser.error(f'Unexpected optimzier {args.optimizer}')
+    use_amp = bool(args.opt_level)
+    if use_amp:
+        from apex import amp
+        model, optimizer = amp.initialize(
+            model, optimizer, opt_level=args.opt_level)
     loss = nn.CrossEntropyLoss()
     step = epoch = 0
     best_f1 = 0
@@ -315,6 +321,7 @@ def main():
         device=device,
         prepare_batch=_prepare_batch,
         accumulation_steps=args.accumulation_steps,
+        use_amp=use_amp,
     )
 
     epochs_left = args.epochs - epoch
@@ -512,6 +519,7 @@ def create_supervised_trainer(
         prepare_batch=_prepare_batch,
         output_transform=lambda x, y, y_pred, loss: loss.item(),
         accumulation_steps: int = 1,
+        use_amp: bool = False,
         ):
 
     def update_fn(engine, batch):
@@ -523,7 +531,12 @@ def create_supervised_trainer(
         x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
         y_pred = model(x)
         loss = loss_fn(y_pred, y)
-        loss.backward()
+        if use_amp:
+            from apex import amp
+            with amp.scale_loss(loss, optimizer) as scaled_loss:
+                scaled_loss.backward()
+        else:
+            loss.backward()
 
         if engine.state.iteration % accumulation_steps == 0:
             optimizer.step()

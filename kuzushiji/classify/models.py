@@ -34,6 +34,8 @@ class Model(nn.Module):
         x, rois, sequences = x
         _, _, input_h, input_w = x.shape
         x_l1, x_l2 = self.base(x)
+        dtype = x_l1.dtype
+        rois = [roi.to(dtype) for roi in rois]
         del x
         x_l1 = roi_align(
             x_l1, rois,
