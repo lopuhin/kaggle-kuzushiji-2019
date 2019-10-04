@@ -22,6 +22,7 @@ def main():
     arg('--threshold', type=float, default=0.0)
     arg('--zero-seg-fp', type=int, default=0)
     arg('--submission', action='store_true')
+    arg('--show-errors', action='store_true')
     args = parser.parse_args()
 
     clf_folder = Path(args.clf_folder)
@@ -80,6 +81,24 @@ def main():
             if max_sim < th:
                 th_cls = seg_fp_id
             pred_ys_by_threshold[th].append(th_cls)
+        topk_sim, topk_idx = torch.topk(sim, k=10)
+        clf_cls = classes[df_detailed.iloc[i].pred]
+        true_cls = test_ys[i]
+        if args.show_errors and not (true_cls == cls == clf_cls):
+            true_mask = train_ys == true_cls
+            if true_mask.any():
+                true_sim = sim[true_mask].max()
+            else:
+                true_sim = 0
+            print(
+                f'true {true_cls:>4}',
+                f'clf {clf_cls:>4}',
+                f'knn {cls:>4}',
+                f'true_sim={true_sim:.3f}',
+                ' '.join(f'{cls_id:>4}={s:.3f}'
+                    for cls_id, s in zip(train_ys[topk_idx], topk_sim)),
+                )
+
     pred_ys_by_threshold = {
         th: np.array(pred_ys) for th, pred_ys in pred_ys_by_threshold.items()}
 
