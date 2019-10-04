@@ -54,6 +54,8 @@ def main():
     arg('--base', default='resnet50')
     arg('--use-sequences', type=int, default=0)
     arg('--head-dropout', type=float, default=0.5)
+    arg('--frozen-start', type=int)
+    arg('--frozen-bn', type=int)
     # Training params
     arg('--device', default='cuda', help='device')
     arg('--opt-level', help='pass 01 to use fp16 training with apex')
@@ -176,8 +178,12 @@ def main():
         )
 
     print('Creating model')
+    fp16 = bool(args.opt_level)
     model: nn.Module = build_model(
         base=args.base,
+        frozen_start=args.frozen_start,
+        frozen_bn=args.frozen_bn,
+        fp16=fp16,
         n_classes=len(classes),
         head_dropout=args.head_dropout,
         use_sequences=bool(args.use_sequences),
@@ -188,23 +194,26 @@ def main():
     model.to(device)
     if args.benchmark:
         torch.backends.cudnn.benchmark = True
+
+    parameters = []
+    for name, param in model.named_parameters():
+        if any(name.startswith(prefix)
+               for prefix in model.base.frozen_prefixes):
+            param.requires_grad = False
+            print(f'frozen {name}')
+        else:
+            parameters.append(param)
+
     if args.optimizer == 'adam':
         optimizer = optim.Adam(
-            model.parameters(),
-            lr=args.lr,
-            weight_decay=args.wd,
-        )
+            parameters, lr=args.lr, weight_decay=args.wd)
     elif args.optimizer == 'sgd':
         optimizer = optim.SGD(
-            model.parameters(),
-            lr=args.lr,
-            weight_decay=args.wd,
-            momentum=0.9,
-        )
+            parameters, lr=args.lr, weight_decay=args.wd, momentum=0.9)
     else:
         parser.error(f'Unexpected optimzier {args.optimizer}')
-    use_amp = bool(args.opt_level)
-    if use_amp:
+
+    if fp16:
         from apex import amp
         model, optimizer = amp.initialize(
             model, optimizer, opt_level=args.opt_level)
@@ -337,7 +346,7 @@ def main():
         device=device,
         prepare_batch=_prepare_batch,
         accumulation_steps=args.accumulation_steps,
-        use_amp=use_amp,
+        fp16=fp16,
     )
 
     epochs_left = args.epochs - epoch
@@ -535,7 +544,7 @@ def create_supervised_trainer(
         prepare_batch=_prepare_batch,
         output_transform=lambda x, y, y_pred, loss: loss.item(),
         accumulation_steps: int = 1,
-        use_amp: bool = False,
+        fp16: bool = False,
         ):
 
     def update_fn(engine, batch):
@@ -547,7 +556,7 @@ def create_supervised_trainer(
         x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
         y_pred = model(x)
         loss = loss_fn(y_pred, y)
-        if use_amp:
+        if fp16:
             from apex import amp
             with amp.scale_loss(loss, optimizer) as scaled_loss:
                 scaled_loss.backward()

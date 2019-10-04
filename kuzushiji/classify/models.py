@@ -12,10 +12,10 @@ def build_model(base: str, n_classes: int, **kwargs) -> nn.Module:
 class Model(nn.Module):
     def __init__(
             self, base: str, n_classes: int, head_dropout: float,
-            use_sequences: bool,
+            use_sequences: bool, **base_kwargs,
             ):
         super().__init__()
-        self.base = ResNetBase(base)
+        self.base = ResNetBase(base, **base_kwargs)
         self.res_l1 = 3
         self.res_l2 = 3
         self.use_sequences = use_sequences
@@ -102,15 +102,50 @@ class Head(nn.Module):
 
 
 class ResNetBase(nn.Module):
-    def __init__(self, name: str = 'resnet50'):
+    def __init__(
+            self,
+            name: str,
+            frozen_start: bool,
+            frozen_bn: bool,
+            fp16: bool,
+            ):
         super().__init__()
         if name.endswith('_wsl'):
             self.base = torch.hub.load('facebookresearch/WSL-Images', name)
         else:
             self.base = getattr(models, name)(pretrained=True)
+        self.frozen_start = frozen_start
+        self.frozen_bn = frozen_bn
+        self.fp16 = fp16
         # conv1 is not the last but they all have the same dim
         self.out_features_l1 = self.base.layer2[-1].conv1.out_channels
         self.out_features_l2 = self.base.layer3[-1].conv1.out_channels
+        self.frozen_prefixes = []
+        if self.frozen_start:
+            # FIXME this is quite ugly
+            self.frozen_prefixes.extend([
+                'base.base.layer1.',
+                'base.base.conv1.',
+                'base.base.bn1.',
+            ])
+
+    def train(self, mode=True):
+        super().train(mode=mode)
+        if self.frozen_start:
+            self._freeze_bn(self.base.bn1)
+            self._freeze_bn(self.base.layer1)
+            self.base.layer1.eval()
+        if self.frozen_bn:
+            self._freeze_bn(self.base)
+
+    def _freeze_bn(self, module):
+        for m in module.modules():
+            if isinstance(m, nn.BatchNorm2d):
+                m.eval()
+                # FIXME this causes stability issues
+               #if self.fp16:
+               #    # https://github.com/NVIDIA/apex/issues/122#issuecomment-453602174
+               #    m.half()
 
     def forward(self, x):
         base = self.base
