@@ -96,12 +96,36 @@ class LongestMaxSizeRandomSizedCrop(A.RandomSizedCrop):
         return super().get_transform_init_args_names() + ('max_size',)
 
 
-def collate_fn(batch):
+def collate_fn(batch, max_targets=None, target_multiple=32):
     images = torch.stack([img for (img, _, _), _ in batch])
     boxes = [b for (_, b, _), _ in batch]
     sequences = [s for (_, _, s), _ in batch]
-    labels = torch.cat([l for _, (l, _) in batch])
     meta = [m for _, (_, m) in batch]
+    labels = [l for _, (l, _) in batch]
+    if max_targets is not None:
+        # Limit and quantize number of targets to have better performance
+        # FIXME sequences not supported (they'd need to be re-mapped)
+        n_targets = sum(l.shape[0] for l in labels)
+        if n_targets > max_targets:
+            n_targets_out = max_targets
+        else:
+            n_targets_out = n_targets // target_multiple * target_multiple
+        if n_targets != n_targets_out:
+            assert n_targets > n_targets_out
+            n_out = 0
+            for i in range(len(batch)):
+                n_image = labels[i].shape[0]
+                if i == len(batch) - 1:
+                    n_out_image = n_targets_out - n_out
+                else:
+                    n_out_image = max(
+                        1, int(n_image * n_targets_out / n_targets))
+                if n_out_image != n_image:
+                    image_indices = torch.randperm(n_image)[:n_out_image]
+                    labels[i] = labels[i][image_indices]
+                    boxes[i] = boxes[i][image_indices, :]
+                n_out += n_out_image
+    labels = torch.cat(labels)
     return (images, boxes, sequences), (labels, meta)
 
 

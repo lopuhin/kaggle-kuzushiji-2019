@@ -1,4 +1,5 @@
 import argparse
+from functools import partial
 from collections import deque
 import json
 from pathlib import Path
@@ -56,6 +57,7 @@ def main():
     arg('--device', default='cuda', help='device')
     arg('--opt-level', help='pass 01 to use fp16 training with apex')
     arg('--batch-size', default=10, type=int)
+    arg('--max-targets', type=int)
     arg('--workers', default=8, type=int,
         help='number of data loading workers')
     arg('--lr', default=14e-3, type=float, help='initial learning rate')
@@ -167,7 +169,7 @@ def main():
             ),
             num_workers=args.workers,
             shuffle=True,
-            collate_fn=collate_fn,
+            collate_fn=partial(collate_fn, max_targets=args.max_targets),
             batch_size=args.batch_size,
         )
 
