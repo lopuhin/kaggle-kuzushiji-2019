@@ -108,8 +108,9 @@ class ResNetBase(nn.Module):
             self.base = torch.hub.load('facebookresearch/WSL-Images', name)
         else:
             self.base = getattr(models, name)(pretrained=True)
-        self.out_features_l1 = 512
-        self.out_features_l2 = 1024
+        # conv1 is not the last but they all have the same dim
+        self.out_features_l1 = self.base.layer2[-1].conv1.out_channels
+        self.out_features_l2 = self.base.layer3[-1].conv1.out_channels
 
     def forward(self, x):
         base = self.base
