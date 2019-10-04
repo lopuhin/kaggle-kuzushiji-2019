@@ -102,7 +102,10 @@ class Head(nn.Module):
 class ResNetBase(nn.Module):
     def __init__(self, name: str = 'resnet50'):
         super().__init__()
-        self.base = getattr(models, name)(pretrained=True)
+        if name.endswith('_wsl'):
+            self.base = torch.hub.load('facebookresearch/WSL-Images', name)
+        else:
+            self.base = getattr(models, name)(pretrained=True)
         self.out_features_l1 = 512
         self.out_features_l2 = 1024
 
