@@ -56,6 +56,7 @@ def main():
     # Training params
     arg('--device', default='cuda', help='device')
     arg('--opt-level', help='pass 01 to use fp16 training with apex')
+    arg('--benchmark', type=int)
     arg('--batch-size', default=10, type=int)
     arg('--max-targets', type=int)
     arg('--workers', default=8, type=int,
@@ -184,6 +185,8 @@ def main():
         print(model)
     device = torch.device(args.device)
     model.to(device)
+    if args.benchmark:
+        torch.backends.cudnn.benchmark = True
     if args.optimizer == 'adam':
         optimizer = optim.Adam(
             model.parameters(),
