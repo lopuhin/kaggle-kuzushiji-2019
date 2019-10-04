@@ -117,9 +117,12 @@ class ResNetBase(nn.Module):
         self.frozen_start = frozen_start
         self.frozen_bn = frozen_bn
         self.fp16 = fp16
-        # conv1 is not the last but they all have the same dim
-        self.out_features_l1 = self.base.layer2[-1].conv1.out_channels
-        self.out_features_l2 = self.base.layer3[-1].conv1.out_channels
+        if name == 'resnet34':
+            self.out_features_l1 = 256
+            self.out_features_l2 = 512
+        else:
+            self.out_features_l1 = 512
+            self.out_features_l2 = 1024
         self.frozen_prefixes = []
         if self.frozen_start:
             # FIXME this is quite ugly
