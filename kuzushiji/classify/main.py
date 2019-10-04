@@ -1,6 +1,7 @@
 import argparse
 from functools import partial
 from collections import deque
+from contextlib import contextmanager
 import json
 from pathlib import Path
 import pandas as pd
@@ -223,6 +224,13 @@ def main():
             model.load_state_dict(state)
         del state
 
+    @contextmanager
+    def no_benchmark():
+        torch.backends.cudnn.benchmark = False
+        yield
+        if args.benchmark:
+            torch.backends.cudnn.benchmark = True
+
     if args.dump_features and not args.submission:
         if not output_dir:
             parser.error('set --output-dir with --dump-features')
@@ -233,8 +241,9 @@ def main():
             prepare_batch=_prepare_batch,
             metrics={'features': GetFeatures(n_tta=args.n_tta)},
         )
-        run_with_pbar(feature_evaluator, data_loader_train,
-                      desc='train features')
+        with no_benchmark():
+            run_with_pbar(feature_evaluator, data_loader_train,
+                          desc='train features')
         torch.save(feature_evaluator.state.metrics['features'],
                    output_dir / 'train_features.pth')
 
@@ -259,7 +268,8 @@ def main():
         metrics=metrics)
 
     def evaluate():
-        run_with_pbar(evaluator, data_loader_test, desc='evaluate')
+        with no_benchmark():
+            run_with_pbar(evaluator, data_loader_test, desc='evaluate')
         metrics = {
             'valid_loss': evaluator.state.metrics['loss'],
             'accuracy': evaluator.state.metrics['accuracy'],
@@ -290,7 +300,8 @@ def main():
         return metrics
 
     def make_submission():
-        run_with_pbar(evaluator, data_loader_test, desc='evaluate')
+        with no_benchmark():
+            run_with_pbar(evaluator, data_loader_test, desc='evaluate')
         submission = []
         for prediction, meta in tqdm.tqdm(
                 evaluator.state.metrics['predictions']):
