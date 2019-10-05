@@ -102,20 +102,13 @@ class Head(nn.Module):
 
 
 class ResNetBase(nn.Module):
-    def __init__(
-            self,
-            name: str,
-            frozen_start: bool,
-            frozen_bn: bool,
-            fp16: bool,
-            ):
+    def __init__(self, name: str, frozen_start: bool, fp16: bool):
         super().__init__()
         if name.endswith('_wsl'):
             self.base = torch.hub.load('facebookresearch/WSL-Images', name)
         else:
             self.base = getattr(models, name)(pretrained=True)
         self.frozen_start = frozen_start
-        self.frozen_bn = frozen_bn
         self.fp16 = fp16
         if name == 'resnet34':
             self.out_features_l1 = 256
@@ -123,11 +116,12 @@ class ResNetBase(nn.Module):
         else:
             self.out_features_l1 = 512
             self.out_features_l2 = 1024
+
+        self.frozen = []
         if self.frozen_start:
-            for m in [self.base.layer1, self.base.conv1, self.base.bn1]:
+            self.frozen = [self.base.layer1, self.base.conv1, self.base.bn1]
+            for m in self.frozen:
                 self._freeze(m)
-        if self.frozen_bn:
-            self._freeze_bn(self.base)
 
     def forward(self, x):
         base = self.base
@@ -141,25 +135,16 @@ class ResNetBase(nn.Module):
         x_l2 = base.layer3(x_l1)
         return x_l1, x_l2
 
-    def train(self, mode=True, apply_fp16=False):
+    def train(self, mode=True):
         super().train(mode=mode)
-        if self.frozen_start:
-            self._freeze_bn(self.base.bn1, apply_fp16)
-            self._freeze_bn(self.base.layer1, apply_fp16)
-        if self.frozen_bn:
-            self._freeze_bn(self.base, apply_fp16)
+        for m in self.frozen:
+            self._bn_to_eval(m)
 
     def _freeze(self, module):
         for p in module.parameters():
             p.requires_grad = False
-        self._freeze_bn(module)
 
-    def _freeze_bn(self, module, apply_fp16=False):
+    def _bn_to_eval(self, module):
         for m in module.modules():
             if isinstance(m, nn.BatchNorm2d):
                 m.eval()
-                if self.fp16 and apply_fp16:
-                    # https://github.com/NVIDIA/apex/issues/122#issuecomment-453602174
-                    m.half()
-                for p in m.parameters():
-                    p.requires_grad = False

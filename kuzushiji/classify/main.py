@@ -55,7 +55,6 @@ def main():
     arg('--use-sequences', type=int, default=0)
     arg('--head-dropout', type=float, default=0.5)
     arg('--frozen-start', type=int)
-    arg('--frozen-bn', type=int)
     # Training params
     arg('--device', default='cuda', help='device')
     arg('--opt-level', help='pass 01 to use fp16 training with apex')
@@ -182,7 +181,6 @@ def main():
     model: nn.Module = build_model(
         base=args.base,
         frozen_start=args.frozen_start,
-        frozen_bn=args.frozen_bn,
         fp16=fp16,
         n_classes=len(classes),
         head_dropout=args.head_dropout,
@@ -209,7 +207,6 @@ def main():
         from apex import amp
         model, optimizer = amp.initialize(
             model, optimizer, opt_level=args.opt_level)
-        model.base.train(apply_fp16=True)
     loss = nn.CrossEntropyLoss()
     step = epoch = 0
     best_f1 = 0
