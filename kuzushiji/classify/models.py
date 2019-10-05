@@ -123,32 +123,11 @@ class ResNetBase(nn.Module):
         else:
             self.out_features_l1 = 512
             self.out_features_l2 = 1024
-        self.frozen_prefixes = []
         if self.frozen_start:
-            # FIXME this is quite ugly
-            self.frozen_prefixes.extend([
-                'base.base.layer1.',
-                'base.base.conv1.',
-                'base.base.bn1.',
-            ])
-
-    def train(self, mode=True):
-        super().train(mode=mode)
-        if self.frozen_start:
-            self._freeze_bn(self.base.bn1)
-            self._freeze_bn(self.base.layer1)
-            self.base.layer1.eval()
+            for m in [self.base.layer1, self.base.conv1, self.base.bn1]:
+                self._freeze(m)
         if self.frozen_bn:
             self._freeze_bn(self.base)
-
-    def _freeze_bn(self, module):
-        for m in module.modules():
-            if isinstance(m, nn.BatchNorm2d):
-                m.eval()
-                # FIXME this causes stability issues
-               #if self.fp16:
-               #    # https://github.com/NVIDIA/apex/issues/122#issuecomment-453602174
-               #    m.half()
 
     def forward(self, x):
         base = self.base
@@ -161,3 +140,26 @@ class ResNetBase(nn.Module):
         del x
         x_l2 = base.layer3(x_l1)
         return x_l1, x_l2
+
+    def train(self, mode=True, apply_fp16=False):
+        super().train(mode=mode)
+        if self.frozen_start:
+            self._freeze_bn(self.base.bn1, apply_fp16)
+            self._freeze_bn(self.base.layer1, apply_fp16)
+        if self.frozen_bn:
+            self._freeze_bn(self.base, apply_fp16)
+
+    def _freeze(self, module):
+        for p in module.parameters():
+            p.requires_grad = False
+        self._freeze_bn(module)
+
+    def _freeze_bn(self, module, apply_fp16=False):
+        for m in module.modules():
+            if isinstance(m, nn.BatchNorm2d):
+                m.eval()
+                if self.fp16 and apply_fp16:
+                    # https://github.com/NVIDIA/apex/issues/122#issuecomment-453602174
+                    m.half()
+                for p in m.parameters():
+                    p.requires_grad = False

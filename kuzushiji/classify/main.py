@@ -195,15 +195,7 @@ def main():
     if args.benchmark:
         torch.backends.cudnn.benchmark = True
 
-    parameters = []
-    for name, param in model.named_parameters():
-        if any(name.startswith(prefix)
-               for prefix in model.base.frozen_prefixes):
-            param.requires_grad = False
-            print(f'frozen {name}')
-        else:
-            parameters.append(param)
-
+    parameters = model.parameters()
     if args.optimizer == 'adam':
         optimizer = optim.Adam(
             parameters, lr=args.lr, weight_decay=args.wd)
@@ -217,6 +209,7 @@ def main():
         from apex import amp
         model, optimizer = amp.initialize(
             model, optimizer, opt_level=args.opt_level)
+        model.base.train(apply_fp16=True)
     loss = nn.CrossEntropyLoss()
     step = epoch = 0
     best_f1 = 0
