@@ -17,7 +17,7 @@ from ..metric import score_boxes, get_metrics
 def main():
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
-    arg('detailed', nargs='+')
+    arg('detailed', nargs='+', help='paths or path=weight items')
     arg('--output')
     arg('--score', action='store_true')
     args = parser.parse_args()
@@ -27,11 +27,21 @@ def main():
         parser.error(f'output {args.output} exists')
     classes = get_encoded_classes()
     cls_by_idx = {idx: cls for cls, idx in classes.items()}
-    dfs = [pd.read_csv(p) for p in args.detailed]
+    dfs = []
+    weights = []
+    for detailed in args.detailed:
+        if '=' in detailed:
+            path, weight = detailed.split('=')
+        else:
+            path, weight = detailed, 1
+        dfs.append(pd.read_csv(path))
+        weights.append(float(weight))
     predictions_by_image_id = defaultdict(list)
     for items in tqdm.tqdm(zip(*[df.itertuples() for df in dfs]),
                            total=len(dfs[0])):
-        preds = [get_pred_dict(item, cls_by_idx) for item in items]
+        assert len(items) == len(weights)
+        preds = [get_pred_dict(item, cls_by_idx, w)
+                 for w, item in zip(weights, items)]
         classes = {cls for pred in preds for cls in pred}
         blend_cls = max(classes, key=lambda cls: sum(
             pred.get(cls, 0) for pred in preds))
@@ -71,10 +81,10 @@ def main():
     pd.DataFrame(submission).to_csv(args.output, index=False)
 
 
-def get_pred_dict(item, cls_by_idx):
+def get_pred_dict(item, cls_by_idx, weight: float):
     return dict(zip(
         [cls_by_idx[int(idx)] for idx in item.top_k_classes.split()],
-        map(float, item.top_k_logits.split())))
+        [weight * float(v) for v in item.top_k_logits.split()]))
 
 
 if __name__ == '__main__':
