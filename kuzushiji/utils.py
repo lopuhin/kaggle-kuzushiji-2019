@@ -17,6 +17,6 @@ def print_metrics(metrics: Dict):
 
 def format_value(v):
     if isinstance(v, float):
-        return f'{v:.4f}'
+        return f'{v:.5f}'
     else:
         return str(v)

@@ -44,7 +44,7 @@ def main():
                  for w, item in zip(weights, items)]
         classes = {cls for pred in preds for cls in pred}
         blend_cls = max(classes, key=lambda cls: sum(
-            pred.get(cls, 0) for pred in preds))
+            ps.get(cls, min(ps.values())) for ps in preds))
         if blend_cls != SEG_FP:
             item = items[0]
             predictions_by_image_id[item.image_id].append({
