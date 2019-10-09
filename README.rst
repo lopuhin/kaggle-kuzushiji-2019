@@ -16,7 +16,6 @@ Install::
 Install libjpeg-turbo as documented at https://github.com/ajkxyz/jpeg4py
 
 Install apex https://github.com/NVIDIA/apex (python-only is good enough)
-(currently not used for submission)
 
 Run
 ---
