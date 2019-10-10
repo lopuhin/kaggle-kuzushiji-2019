@@ -81,7 +81,7 @@ def main():
     pd.DataFrame(submission).to_csv(args.output, index=False)
 
 
-def get_pred_dict(item, cls_by_idx, weight: float):
+def get_pred_dict(item, cls_by_idx, weight: float = 1):
     return dict(zip(
         [cls_by_idx[int(idx)] for idx in item.top_k_classes.split()],
         [weight * float(v) for v in item.top_k_logits.split()]))
