@@ -3,6 +3,7 @@ imageio==2.5.0
 imgaug==0.2.6
 jpeg4py==0.1.4
 json-log-plots==0.0.1
+lightgbm==2.3.0
 matplotlib==3.1.1
 networkx==2.3
 numpy==1.16.4
