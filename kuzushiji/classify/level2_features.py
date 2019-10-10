@@ -13,7 +13,7 @@ def main():
     arg = parser.add_argument
     arg('detailed', nargs='+',
         help='predictions on test in "detailed_*" format')
-    arg('output', help='path where predictions are written as ground truth')
+    arg('output', help='output path for kuzushiji.classify.level2')
     arg('--top-k', type=int, default=5)
     args = parser.parse_args()
     if Path(args.output).exists():

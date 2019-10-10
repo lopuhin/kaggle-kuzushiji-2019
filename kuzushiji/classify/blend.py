@@ -55,16 +55,9 @@ def main():
         score_predictions_by_image_id(predictions_by_image_id)
         return
 
-    submission = [submission_item(image_id, prediction)
-                  for image_id, prediction in predictions_by_image_id.items()
-                  if prediction]
-    sample_submission = pd.read_csv(DATA_ROOT / 'sample_submission.csv')
-    empty_pages = (set(sample_submission['image_id']) -
-                   set(x['image_id'] for x in submission))
-    submission.extend(submission_item(image_id, [])
-                      for image_id in empty_pages)
-    pd.DataFrame(submission).to_csv(args.output, index=False)
-
+    submission = submission_from_predictions_by_image_id(
+        predictions_by_image_id)
+    submission.to_csv(args.output, index=False)
 
 
 def score_predictions_by_image_id(predictions_by_image_id):
@@ -84,6 +77,18 @@ def score_predictions_by_image_id(predictions_by_image_id):
             preds_label=np.array(pred_labels),
         ))
     print_metrics(get_metrics(scores))
+
+
+def submission_from_predictions_by_image_id(predictions_by_image_id):
+    submission = [submission_item(image_id, prediction)
+                  for image_id, prediction in predictions_by_image_id.items()
+                  if prediction]
+    sample_submission = pd.read_csv(DATA_ROOT / 'sample_submission.csv')
+    empty_pages = (set(sample_submission['image_id']) -
+                   set(x['image_id'] for x in submission))
+    submission.extend(submission_item(image_id, [])
+                      for image_id in empty_pages)
+    return pd.DataFrame(submission)
 
 
 def get_pred_dict(item, cls_by_idx, weight: float = 1):
