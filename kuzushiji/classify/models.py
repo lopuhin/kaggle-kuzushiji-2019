@@ -132,6 +132,22 @@ class Head2(nn.Module):
         return self.fc3(x)
 
 
+class Head3(nn.Module):
+    def __init__(self, in_features: int, n_classes: int, dropout: float):
+        super().__init__()
+        self.dropout = nn.Dropout(dropout) if dropout else None
+        self.fc = nn.Linear(in_features, n_classes)
+
+    def forward(self, x):
+        if self.dropout is not None:
+            x = self.dropout(x)
+        x = self.apply_fc_out(x)
+        return x, x
+
+    def apply_fc_out(self, x):
+        return self.fc(x)
+
+
 class ResNetBase(nn.Module):
     def __init__(self, name: str, frozen_start: bool, fp16: bool):
         super().__init__()
