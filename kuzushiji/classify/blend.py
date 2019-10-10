@@ -52,22 +52,7 @@ def main():
                 'center': (item.x + item.w / 2, item.y + item.h / 2),
             })
     if args.score:
-        gt_by_image_id = {item.image_id: item
-                          for item in load_train_df().itertuples()}
-        scores = []
-        for image_id, predictions in predictions_by_image_id.items():
-            item = gt_by_image_id[image_id]
-            target_boxes, target_labels = get_target_boxes_labels(item)
-            target_boxes = torch.from_numpy(target_boxes)
-            pred_centers = [p['center'] for p in predictions]
-            pred_labels = [p['cls'] for p in predictions]
-            scores.append(score_boxes(
-                truth_boxes=from_coco(target_boxes).numpy(),
-                truth_label=target_labels,
-                preds_center=np.array(pred_centers),
-                preds_label=np.array(pred_labels),
-            ))
-        print_metrics(get_metrics(scores))
+        score_predictions_by_image_id(predictions_by_image_id)
         return
 
     submission = [submission_item(image_id, prediction)
@@ -79,6 +64,26 @@ def main():
     submission.extend(submission_item(image_id, [])
                       for image_id in empty_pages)
     pd.DataFrame(submission).to_csv(args.output, index=False)
+
+
+
+def score_predictions_by_image_id(predictions_by_image_id):
+    gt_by_image_id = {item.image_id: item
+                      for item in load_train_df().itertuples()}
+    scores = []
+    for image_id, predictions in predictions_by_image_id.items():
+        item = gt_by_image_id[image_id]
+        target_boxes, target_labels = get_target_boxes_labels(item)
+        target_boxes = torch.from_numpy(target_boxes)
+        pred_centers = [p['center'] for p in predictions]
+        pred_labels = [p['cls'] for p in predictions]
+        scores.append(score_boxes(
+            truth_boxes=from_coco(target_boxes).numpy(),
+            truth_label=target_labels,
+            preds_center=np.array(pred_centers),
+            preds_label=np.array(pred_labels),
+        ))
+    print_metrics(get_metrics(scores))
 
 
 def get_pred_dict(item, cls_by_idx, weight: float = 1):

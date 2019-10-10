@@ -24,8 +24,8 @@ def main():
     cls_by_idx = {idx: cls for cls, idx in classes.items()}
     classes[SEG_FP] = -1  # should create better splits
     output = []
-    for items in tqdm.tqdm(zip(*[df.itertuples() for df in dfs]),
-                           total=len(dfs[0])):
+    for i, items in tqdm.tqdm(enumerate(zip(*[df.itertuples() for df in dfs])),
+                              total=len(dfs[0])):
         item = items[0]
         preds = [get_pred_dict(item, cls_by_idx) for item in items]
         blend = {cls: sum(p.get(cls, 0) for p in preds) / len(preds)
@@ -33,8 +33,9 @@ def main():
         true = item.true
         top_k = sorted(
             blend.items(), key=lambda cs: cs[1], reverse=True)[:args.top_k]
-        features = {
-            f'top_{i}_cls': classes[cls] for i, (cls, _) in enumerate(top_k)}
+        features = {'item': i}
+        features.update({
+            f'top_{i}_cls': classes[cls] for i, (cls, _) in enumerate(top_k)})
         features.update({
             f'top_{i}_score': score for i, (_, score) in enumerate(top_k)})
         if not any(true == cls for cls, _ in top_k):
