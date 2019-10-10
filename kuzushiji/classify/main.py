@@ -95,7 +95,7 @@ def main():
 
     print('Loading data')
     df_train_gt, df_valid_gt = load_train_valid_df(args.fold, args.n_folds)
-    df_clf_gt = load_train_df(args.clf_gt)
+    df_clf_gt = load_train_df(args.clf_gt)[['labels', 'image_id']]
     if args.submission:
         df_valid = df_train = df_clf_gt
         empty_index = df_valid['labels'] == ''
