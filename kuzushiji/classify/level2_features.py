@@ -40,7 +40,7 @@ def main():
             f'top_{i}_score': score for i, (_, score) in enumerate(top_k)})
         if not any(true == cls for cls, _ in top_k):
             true = SEG_FP  # it harms F1 less: one fn instead of fn + fp
-        for cls in ({cls for cls, _ in top_k} | {true}):
+        for cls in ({cls for cls, _ in top_k} | {true, SEG_FP}):
             output.append(dict(
                 features,
                 candidate_cls=classes[cls], 
