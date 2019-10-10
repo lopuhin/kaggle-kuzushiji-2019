@@ -1,5 +1,6 @@
 import argparse
 from collections import defaultdict
+import re
 
 import lightgbm as lgb
 import pandas as pd
@@ -24,9 +25,18 @@ def main():
     assert train_df.columns[0] == 'item'
     assert train_df.columns[-1] == 'y'
     feature_cols = train_df.columns[1:-1]
+
+    def build_features(df):
+        df = df[feature_cols].copy()
+        for col in feature_cols:
+           if re.match('top_\d+_cls$', col):
+               df[f'{col}_is_candidate'] = df[col] == df['candidate_cls']
+        return df
+
     # TODO check categorical features
-    train_data = lgb.Dataset(train_df[feature_cols], train_df['y'])
-    valid_data = lgb.Dataset(valid_df[feature_cols], valid_df['y'],
+    train_data = lgb.Dataset(build_features(train_df), train_df['y'])
+    valid_features = build_features(valid_df)
+    valid_data = lgb.Dataset(valid_features, valid_df['y'],
                              reference=train_data)
     params = {
         'objective': 'binary',
@@ -37,11 +47,13 @@ def main():
         train_set=train_data,
         num_boost_round=args.num_boost_round,
         valid_sets=[valid_data])
+    print('prediction')
     valid_df['y_pred'] = bst.predict(
-        valid_df[feature_cols], num_iteration=bst.best_iteration)
+        valid_features, num_iteration=bst.best_iteration)
     max_by_item = valid_df.iloc[valid_df.groupby('item')['y_pred'].idxmax()]
     max_by_item = max_by_item.reset_index(drop=True)
 
+    print('scoring')
     classes = get_encoded_classes()
     cls_by_idx = {idx: cls for cls, idx in classes.items()}
     cls_by_idx[-1] = SEG_FP
@@ -59,7 +71,6 @@ def main():
                 'center': (item.x + item.w / 2, item.y + item.h / 2),
             })
     score_predictions_by_image_id(predictions_by_image_id)
-
 
 
 if __name__ == '__main__':
