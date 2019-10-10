@@ -11,7 +11,8 @@ def build_model(base: str, n_classes: int, **kwargs) -> nn.Module:
 
 class Model(nn.Module):
     def __init__(
-            self, base: str, n_classes: int, head_dropout: float,
+            self, *, base: str, head: str,
+            n_classes: int, head_dropout: float,
             use_sequences: bool, **base_kwargs,
             ):
         super().__init__()
@@ -19,7 +20,8 @@ class Model(nn.Module):
         self.res_l1 = 3
         self.res_l2 = 3
         self.use_sequences = use_sequences
-        self.head = Head(
+        head_cls = globals()[head]
+        self.head = head_cls(
             in_features=(self.base.out_features_l1 * self.res_l1 ** 2 +
                          self.base.out_features_l2 * self.res_l2 ** 2),
             n_classes=n_classes,
@@ -99,6 +101,35 @@ class Head(nn.Module):
 
     def apply_fc_out(self, x):
         return self.fc2(x)
+
+
+class Head2(nn.Module):
+    def __init__(self, in_features: int, n_classes: int, dropout: float):
+        super().__init__()
+        self.hidden_dim = 1024
+        self.dropout = nn.Dropout(dropout) if dropout else None
+        self.fc1 = nn.Linear(in_features, self.hidden_dim)
+        self.bn1 = nn.BatchNorm1d(self.hidden_dim)
+        self.fc2 = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.bn2 = nn.BatchNorm1d(self.hidden_dim)
+        self.fc3 = nn.Linear(self.hidden_dim, n_classes)
+
+    def forward(self, x):
+        if self.dropout is not None:
+            x = self.dropout(x)
+        x = F.relu(self.fc1(x))
+        if self.dropout is not None:
+            x = self.dropout(x)
+        x = self.bn1(x)
+        x = F.relu(self.fc2(x))
+        if self.dropout is not None:
+            x = self.dropout(x)
+        x_features = self.bn2(x)
+        x = self.apply_fc_out(x_features)
+        return x, x_features
+
+    def apply_fc_out(self, x):
+        return self.fc3(x)
 
 
 class ResNetBase(nn.Module):

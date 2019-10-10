@@ -55,6 +55,7 @@ def main():
     arg('--use-sequences', type=int, default=0)
     arg('--head-dropout', type=float, default=0.5)
     arg('--frozen-start', type=int)
+    arg('--head', type=str, default='Head')
     # Training params
     arg('--device', default='cuda', help='device')
     arg('--opt-level', help='pass 01 to use fp16 training with apex')
@@ -180,6 +181,7 @@ def main():
     fp16 = bool(args.opt_level)
     model: nn.Module = build_model(
         base=args.base,
+        head=args.head,
         frozen_start=args.frozen_start,
         fp16=fp16,
         n_classes=len(classes),
