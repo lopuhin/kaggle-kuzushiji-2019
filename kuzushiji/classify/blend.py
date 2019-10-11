@@ -52,7 +52,7 @@ def main():
                 'center': (item.x + item.w / 2, item.y + item.h / 2),
             })
     if args.score:
-        score_predictions_by_image_id(predictions_by_image_id)
+        print_metrics(score_predictions_by_image_id(predictions_by_image_id))
         return
 
     submission = submission_from_predictions_by_image_id(
@@ -76,7 +76,7 @@ def score_predictions_by_image_id(predictions_by_image_id):
             preds_center=np.array(pred_centers),
             preds_label=np.array(pred_labels),
         ))
-    print_metrics(get_metrics(scores))
+    return get_metrics(scores)
 
 
 def submission_from_predictions_by_image_id(predictions_by_image_id):
