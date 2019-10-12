@@ -99,7 +99,9 @@ def main():
                 train_set=train_data,
                 num_boost_round=args.num_boost_round,
                 early_stopping_rounds=10,
-                valid_sets=[valid_data])
+                valid_sets=[valid_data],
+                verbose=10,
+            )
         if args.save_model:
             save_path = fold_path(args.save_model)
             print(f'saving to {save_path}')
