@@ -14,7 +14,7 @@ def main():
     arg('detailed', nargs='+',
         help='predictions on test in "detailed_*" format')
     arg('output', help='output path for kuzushiji.classify.level2')
-    arg('--top-k', type=int, default=5)
+    arg('--top-k', type=int, default=3)
     args = parser.parse_args()
     if Path(args.output).exists():
         parser.error(f'output {args.output} exists')

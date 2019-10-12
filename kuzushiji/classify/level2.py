@@ -18,7 +18,8 @@ def main():
     arg = parser.add_argument
     arg('detailed_then_features', nargs='+',
         help='detailed dataframes and the features in the same order')
-    arg('--num-boost-round', type=int, default=100)
+    arg('--num-boost-round', type=int, default=200)
+    arg('--lr', type=float, default=0.1)
     arg('--save-model')
     arg('--load-model')
     arg('--output')
@@ -45,12 +46,15 @@ def main():
     assert valid_df.columns[0] == 'item'
     assert valid_df.columns[-1] == 'y'
     feature_cols = valid_df.columns[1:-1]
+    top_cls_re = re.compile('^top_\d+_cls$')
 
     def build_features(df):
         df = df[feature_cols].copy()
         for col in feature_cols:
-           if re.match('top_\d+_cls$', col):
-               df[f'{col}_is_candidate'] = df[col] == df['candidate_cls']
+            if top_cls_re.match(col):
+                df[f'{col}_is_candidate'] = df[col] == df['candidate_cls']
+                # del df[col]
+        print(' '.join(df.columns))
         return df
 
     classes = get_encoded_classes()
@@ -74,23 +78,32 @@ def main():
         else:
             train_df = pd.concat([df for i, df in enumerate(feature_dfs)
                                   if i != fold_num])
-            # TODO check categorical features
-            train_data = lgb.Dataset(build_features(train_df), train_df['y'])
-            valid_data = lgb.Dataset(valid_features, valid_df['y'],
-                                     reference=train_data)
+            train_data = lgb.Dataset(
+                build_features(train_df), train_df['y'])
+            valid_data = lgb.Dataset(
+                valid_features, valid_df['y'], reference=train_data)
             params = {
                 'objective': 'binary',
-                'metric': ['auc', 'binary_logloss'],
+                'metric': 'binary_logloss',
+                'learning_rate': args.lr,
+                'bagging_fraction': 0.8,
+                'bagging_freq': 5,
+                'feature_fraction': 0.9,
+                'min_data_in_leaf': 20,
+                'num_leaves': 31,
+                'scale_pos_weight': 1.2,
             }
+            print(params)
             bst = lgb.train(
                 params=params,
                 train_set=train_data,
                 num_boost_round=args.num_boost_round,
+                early_stopping_rounds=10,
                 valid_sets=[valid_data])
         if args.save_model:
             save_path = fold_path(args.save_model)
             print(f'saving to {save_path}')
-            bst.save_model(save_path)
+            bst.save_model(save_path, num_iteration=bst.best_iteration)
 
         print('prediction')
         valid_df['y_pred'] = bst.predict(
@@ -113,9 +126,6 @@ def main():
             print_metrics(metrics)
             all_metrics.append(metrics)
 
-    print('\nAll folds:')
-    print_metrics(get_metrics(all_metrics))
-
     if args.output:
         valid_df['y_pred'] = np.mean(y_preds, axis=0)
         max_by_item = get_max_by_item(valid_df)
@@ -125,6 +135,10 @@ def main():
         submission = submission_from_predictions_by_image_id(
             predictions_by_image_id)
         submission.to_csv(args.output, index=False)
+    else:
+        print(params)
+        print('\nAll folds:')
+        print_metrics(get_metrics(all_metrics))
 
 
 def get_max_by_item(df):
