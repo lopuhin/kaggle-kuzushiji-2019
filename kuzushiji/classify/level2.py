@@ -1,5 +1,6 @@
 import argparse
 from collections import defaultdict
+import pickle
 import re
 
 import lightgbm as lgb
@@ -19,6 +20,8 @@ def main():
     arg = parser.add_argument
     arg('detailed_then_features', nargs='+',
         help='detailed dataframes and the features in the same order')
+    arg('--use-xgb', type=int, default=1)
+    arg('--use-lgb', type=int, default=1)
     arg('--num-boost-round', type=int, default=200)
     arg('--lr', type=float, default=0.1, help='for lightgbm')
     arg('--eta', type=float, default=0.15, help='for xgboost')
@@ -77,37 +80,56 @@ def main():
         valid_features = build_features(valid_df)
         xgb_valid_data = xgb.DMatrix(valid_features, label=valid_df['y'])
 
-        fold_path = lambda path: f'{path}.fold{fold_num}'
+        fold_path = lambda path, kind: f'{path}.{kind}.fold{fold_num}'
         if args.load_model:
-            load_path = fold_path(args.load_model)
-            print(f'loading from {load_path}')
-            lgb_model = lgb.Booster(model_file=load_path)
+            lgb_load_path = (fold_path(args.load_model, 'lgb')
+                             if args.use_lgb else None)
+            xgb_load_path = (fold_path(args.load_model, 'xgb')
+                             if args.use_xgb else None)
+            print(f'loading from {lgb_load_path}, {xgb_load_path}')
+            if lgb_load_path:
+                lgb_model = lgb.Booster(model_file=lgb_load_path)
+            if xgb_load_path:
+                with open(xgb_load_path, 'rb') as f:
+                    xgb_model = pickle.load(f)
         else:
             train_df = pd.concat([df for i, df in enumerate(feature_dfs)
                                   if i != fold_num])
             train_features = build_features(train_df)
-            lgb_model = train_lgb(
-                train_features, train_df['y'],
-                valid_features, valid_df['y'],
-                lr=args.lr,
-                num_boost_round=args.num_boost_round)
-            xgb_model = train_xgb(
-                train_features, train_df['y'],
-                valid_features, valid_df['y'],
-                eta=args.eta,
-                num_boost_round=args.num_boost_round)
+            if args.use_lgb:
+                lgb_model = train_lgb(
+                    train_features, train_df['y'],
+                    valid_features, valid_df['y'],
+                    lr=args.lr,
+                    num_boost_round=args.num_boost_round)
+            if args.use_xgb:
+                xgb_model = train_xgb(
+                    train_features, train_df['y'],
+                    valid_features, valid_df['y'],
+                    eta=args.eta,
+                    num_boost_round=args.num_boost_round)
         if args.save_model:
-            save_path = fold_path(args.save_model)
-            print(f'saving to {save_path}')
-            lgb_model.save_model(
-                save_path, num_iteration=lgb_model.best_iteration)
+            lgb_save_path = (fold_path(args.save_model, 'lgb')
+                             if args.use_lgb else None)
+            xgb_save_path = (fold_path(args.save_model, 'xgb')
+                             if args.use_xgb else None)
+            print(f'saving to {lgb_save_path}, {xgb_save_path}')
+            if lgb_save_path:
+                lgb_model.save_model(
+                    lgb_save_path, num_iteration=lgb_model.best_iteration)
+            if xgb_save_path:
+                with open(xgb_save_path, 'wb') as f:
+                    pickle.dump(xgb_model, f)
 
         print('prediction')
-        lgb_y_pred = lgb_model.predict(
-            valid_features, num_iteration=lgb_model.best_iteration)
-        xgb_y_pred = xgb_model.predict(
-            xgb_valid_data, ntree_limit=xgb_model.best_ntree_limit)
-        valid_df['y_pred'] = np.mean([lgb_y_pred, xgb_y_pred], axis=0)
+        predictions = []
+        if args.use_lgb:
+            predictions.append(lgb_model.predict(
+                valid_features, num_iteration=lgb_model.best_iteration))
+        if args.use_xgb:
+            predictions.append(xgb_model.predict(
+                xgb_valid_data, ntree_limit=xgb_model.best_ntree_limit))
+        valid_df['y_pred'] = np.mean(predictions, axis=0)
         if args.seg_fp_adjust:
             valid_df.loc[valid_df['candidate_cls'] == -1, 'y_pred'] += \
                 args.seg_fp_adjust
@@ -141,7 +163,6 @@ def main():
     else:
         print('\nAll folds:')
         print_metrics(get_metrics(all_metrics))
-
 
 
 def train_lgb(train_features, train_y, valid_features, valid_y, *,
@@ -178,6 +199,7 @@ def train_xgb(train_features, train_y, valid_features, valid_y, *,
     params = {
         'eta': eta,
         'objective': 'binary:logistic',
+        'gamma': 0.01,
     }
     print(params)
     eval_list = [(valid_data, 'eval')]
