@@ -5,6 +5,7 @@ import re
 import lightgbm as lgb
 import pandas as pd
 import numpy as np
+import xgboost as xgb
 
 from ..data_utils import SEG_FP, get_encoded_classes
 from ..utils import print_metrics
@@ -19,7 +20,8 @@ def main():
     arg('detailed_then_features', nargs='+',
         help='detailed dataframes and the features in the same order')
     arg('--num-boost-round', type=int, default=200)
-    arg('--lr', type=float, default=0.1)
+    arg('--lr', type=float, default=0.1, help='for lightgbm')
+    arg('--eta', type=float, default=0.15, help='for xgboost')
     arg('--save-model')
     arg('--load-model')
     arg('--output')
@@ -67,54 +69,45 @@ def main():
 
     y_preds = []
     all_metrics = []
-    params = None
     for fold_num in range(args.n_folds):
         print(f'fold {fold_num}')
         detailed = (detailed_dfs[fold_num if len(detailed_dfs) != 1 else 0]
                     .copy())
         valid_df = feature_dfs[fold_num if len(feature_dfs) != 1 else 0].copy()
         valid_features = build_features(valid_df)
+        xgb_valid_data = xgb.DMatrix(valid_features, label=valid_df['y'])
 
         fold_path = lambda path: f'{path}.fold{fold_num}'
         if args.load_model:
             load_path = fold_path(args.load_model)
             print(f'loading from {load_path}')
-            bst = lgb.Booster(model_file=load_path)
+            lgb_model = lgb.Booster(model_file=load_path)
         else:
             train_df = pd.concat([df for i, df in enumerate(feature_dfs)
                                   if i != fold_num])
-            train_data = lgb.Dataset(
-                build_features(train_df), train_df['y'])
-            valid_data = lgb.Dataset(
-                valid_features, valid_df['y'], reference=train_data)
-            params = {
-                'objective': 'binary',
-                'metric': 'binary_logloss',
-                'learning_rate': args.lr,
-                'bagging_fraction': 0.8,
-                'bagging_freq': 5,
-                'feature_fraction': 0.9,
-                'min_data_in_leaf': 20,
-                'num_leaves': 31,
-                'scale_pos_weight': 1.2,
-            }
-            print(params)
-            bst = lgb.train(
-                params=params,
-                train_set=train_data,
-                num_boost_round=args.num_boost_round,
-                early_stopping_rounds=10,
-                valid_sets=[valid_data],
-                verbose_eval=10,
-            )
+            train_features = build_features(train_df)
+            lgb_model = train_lgb(
+                train_features, train_df['y'],
+                valid_features, valid_df['y'],
+                lr=args.lr,
+                num_boost_round=args.num_boost_round)
+            xgb_model = train_xgb(
+                train_features, train_df['y'],
+                valid_features, valid_df['y'],
+                eta=args.eta,
+                num_boost_round=args.num_boost_round)
         if args.save_model:
             save_path = fold_path(args.save_model)
             print(f'saving to {save_path}')
-            bst.save_model(save_path, num_iteration=bst.best_iteration)
+            lgb_model.save_model(
+                save_path, num_iteration=lgb_model.best_iteration)
 
         print('prediction')
-        valid_df['y_pred'] = bst.predict(
-            valid_features, num_iteration=bst.best_iteration)
+        lgb_y_pred = lgb_model.predict(
+            valid_features, num_iteration=lgb_model.best_iteration)
+        xgb_y_pred = xgb_model.predict(
+            xgb_valid_data, ntree_limit=xgb_model.best_ntree_limit)
+        valid_df['y_pred'] = np.mean([lgb_y_pred, xgb_y_pred], axis=0)
         if args.seg_fp_adjust:
             valid_df.loc[valid_df['candidate_cls'] == -1, 'y_pred'] += \
                 args.seg_fp_adjust
@@ -146,9 +139,53 @@ def main():
             predictions_by_image_id)
         submission.to_csv(args.output, index=False)
     else:
-        print(params)
         print('\nAll folds:')
         print_metrics(get_metrics(all_metrics))
+
+
+
+def train_lgb(train_features, train_y, valid_features, valid_y, *,
+              lr, num_boost_round):
+    train_data = lgb.Dataset(train_features, train_y)
+    valid_data = lgb.Dataset(valid_features, valid_y, reference=train_data)
+    params = {
+        'objective': 'binary',
+        'metric': 'binary_logloss',
+        'learning_rate': lr,
+        'bagging_fraction': 0.8,
+        'bagging_freq': 5,
+        'feature_fraction': 0.9,
+        'min_data_in_leaf': 20,
+        'num_leaves': 31,
+        'scale_pos_weight': 1.2,
+        'lambda_l2': 1,
+    }
+    print(params)
+    return lgb.train(
+        params=params,
+        train_set=train_data,
+        num_boost_round=num_boost_round,
+        early_stopping_rounds=20,
+        valid_sets=[valid_data],
+        verbose_eval=10,
+    )
+
+
+def train_xgb(train_features, train_y, valid_features, valid_y, *,
+              eta, num_boost_round):
+    train_data = xgb.DMatrix(train_features, label=train_y)
+    valid_data = xgb.DMatrix(valid_features, label=valid_y)
+    params = {
+        'eta': eta,
+        'objective': 'binary:logistic',
+    }
+    print(params)
+    eval_list = [(valid_data, 'eval')]
+    return xgb.train(
+        params, train_data, num_boost_round, eval_list,
+        early_stopping_rounds=20,
+        verbose_eval=10,
+    )
 
 
 def get_max_by_item(df):
