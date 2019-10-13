@@ -34,8 +34,6 @@ def main():
     if args.output:
         if not args.load_model:
             parser.error('--output needs --load-model')
-        if len(feature_paths) != 1:
-            parser.error('one features file expected with --output')
     elif len(feature_paths) == 1:
         parser.error('need more than one feature df for train/valid split')
     print('\n'.join(
