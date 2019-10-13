@@ -46,7 +46,12 @@ def main():
     valid_df = feature_dfs[0]
     assert valid_df.columns[0] == 'item'
     assert valid_df.columns[-1] == 'y'
-    feature_cols = valid_df.columns[1:-1]
+    feature_cols = [
+        col for col in valid_df.columns[1:-1] if col not in {
+            'width', 'height', 'aspect',
+            'candidate_count', 'candidate_count_on_page',
+            'candidate_freq_on_page',
+        }]
     top_cls_re = re.compile('^top_\d+_cls$')
 
     def build_features(df):
