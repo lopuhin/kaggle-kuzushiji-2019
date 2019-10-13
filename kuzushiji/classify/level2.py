@@ -24,6 +24,7 @@ def main():
     arg('--load-model')
     arg('--output')
     arg('--n-folds', type=int, default=5)
+    arg('--seg-fp-adjust', type=float)
     args = parser.parse_args()
     if len(args.detailed_then_features) % 2 != 0:
         parser.error('number of detailed and features must be equal')
@@ -63,6 +64,7 @@ def main():
 
     y_preds = []
     all_metrics = []
+    params = None
     for fold_num in range(args.n_folds):
         print(f'fold {fold_num}')
         detailed = (detailed_dfs[fold_num if len(detailed_dfs) != 1 else 0]
@@ -110,6 +112,9 @@ def main():
         print('prediction')
         valid_df['y_pred'] = bst.predict(
             valid_features, num_iteration=bst.best_iteration)
+        if args.seg_fp_adjust:
+            valid_df.loc[valid_df['candidate_cls'] == -1, 'y_pred'] += \
+                args.seg_fp_adjust
         y_preds.append(valid_df['y_pred'].values)
         max_by_item = get_max_by_item(valid_df)
 
