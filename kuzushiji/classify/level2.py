@@ -22,8 +22,8 @@ def main():
         help='detailed dataframes and the features in the same order')
     arg('--use-xgb', type=int, default=1)
     arg('--use-lgb', type=int, default=1)
-    arg('--num-boost-round', type=int, default=200)
-    arg('--lr', type=float, default=0.1, help='for lightgbm')
+    arg('--num-boost-round', type=int, default=400)
+    arg('--lr', type=float, default=0.05, help='for lightgbm')
     arg('--eta', type=float, default=0.15, help='for xgboost')
     arg('--save-model')
     arg('--load-model')
@@ -177,7 +177,7 @@ def train_lgb(train_features, train_y, valid_features, valid_y, *,
         'bagging_freq': 5,
         'feature_fraction': 0.9,
         'min_data_in_leaf': 20,
-        'num_leaves': 31,
+        'num_leaves': 41,
         'scale_pos_weight': 1.2,
         'lambda_l2': 1,
     }
@@ -200,6 +200,7 @@ def train_xgb(train_features, train_y, valid_features, valid_y, *,
         'eta': eta,
         'objective': 'binary:logistic',
         'gamma': 0.01,
+        'max_depth': 8,
     }
     print(params)
     eval_list = [(valid_data, 'eval')]
