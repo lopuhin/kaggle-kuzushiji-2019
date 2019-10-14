@@ -65,7 +65,7 @@ General approach is as follows:
 Why such approach was chosen? There are two other candidate approaches:
 
 - End-to-end model which does detection and classification
-  (e.g. Mask-RCNN). This may be possible with some effort, but here it seems
+  (e.g. Faster-RCNN). This may be possible with some effort, but here it seems
   that segmentation is quite easy, while classification is hard, and it's
   more convenient to tune a classification model alone without worrying
   about detection, also pipeline is easier and more flexible.
@@ -82,7 +82,7 @@ Next come more details on each stage.
 Segmentation
 ------------
 
-Segmentation into characters is done with a Fast-RCNN model with ``resnet152``
+Segmentation into characters is done with a Faster-RCNN model with ``resnet152``
 backbone trained with torchvision. Only one class is used, so it does not
 try to predict the character class. This model trains very fast and gives
 high quality boxes. Competition F1 metric (assuming
@@ -102,11 +102,11 @@ Some details:
 
 Overall many more improvements are possible here: using mmdetection,
 better models, pre-training on COCO, blending predictions from different folds
-for submission, separate model to discard out-of-page symbols, etc.
+for submission, TTA, separate model to discard out-of-page symbols, etc.
 Still it seemed that classification was more important.
 
-See kuzushiji.segment, which is based on torchvision detection reference,
-and kuzushiji.segment.dataset for the dataset.
+See ``kuzushiji.segment``, which is based on torchvision detection reference,
+and ``kuzushiji.segment.dataset`` for the dataset.
 
 Classification
 --------------
@@ -146,6 +146,7 @@ Some details:
 * quite large scale and color augmentations were used: hue/saturation/value,
   random brighness, contrast and gamma, all from Albumentations library.
 * TTA (test-time-augmentation) of 4 different scales was used.
+* ``resnext101_32x8d_wsl`` took around 15 hours to train on one 2080ti.
 
 Best single model without pseudolabelling obtained public LB score of 0.935,
 although score varied quite a lot between folds,
@@ -157,23 +158,23 @@ Overall, many improvement are possible here, from just using bigger models
 and freezing less layers, to more work on training schedule, augmentations,
 etc.
 
-See kuzushiji.classify.main for the training script,
-kuzushiji.classify.models for the models,
-and kuzushiji.classify.dataset for the dataset and augmentations.
+See ``kuzushiji.classify.main`` for the training script,
+``kuzushiji.classify.models`` for the models,
+and ``kuzushiji.classify.dataset`` for the dataset and augmentations.
 
 Pseudolabelling
 ---------------
 
 Pseudolabelling is a technique where we take confident predictions of our model
-on test data, and add this to train. Even though the model is already confident
+on test data, and add this to train dataset. Even though the model is already confident
 in such predictions, they are still useful and improve quality, because
 they allow the model to adapt better to different domain, as each book
 has it's own character and paper style, each author has different writing,
 etc.
 
 Here the simplest approach was chosen: most confident predictions were used
-for all test, instead of splitting it by book. Top 80% most confident
-predictions from the blend were used, having accuracy >99% according on
+for all test set, instead of splitting it by book. Top 80% most confident
+predictions from the blend were used, having accuracy >99% according to
 validation. Next, two kinds of models were trained
 (all based on ``resnext101_32x8d_wsl``):
 
@@ -187,7 +188,7 @@ Best fine-tuned model scored 0.938 on the public LB.
 From-scratch models were not submitted separately but from their contribution
 to the ensemble, they could be even better.
 
-See kuzushiji.classify.pseudolabel for creation of test targets.
+See ``kuzushiji.classify.pseudolabel`` for creation of test targets.
 
 Second level model
 ------------------
@@ -198,19 +199,19 @@ models didn't improve the validation score, even though ``resnext101_32x8d_wsl``
 models were noticeably better.
 
 Since all models were trained across all folds, it was possible to train
-a second level model, a blend of lightgmb and xgboost.
+a second level model, a blend of LightGBM and XGBoost.
 This model was inspired by Pavel Ostyakov's solution to
 Cdiscount’s Image Classification Challenge, which was a classification
 problem with 5k classes:
 https://www.kaggle.com/c/cdiscount-image-classification-challenge/discussion/45733
 
-Each of 4 models kinds from classification contribute
+Each of 4 model kinds from classification contributed
 classes and scores of top-3 predictions as features. Also max overlap
-with other bboxes is added. Then for each of all classes in top-3 predictions,
-and for a ``seg_fp`` class, we create one row with an extra feature ``candidate``,
-which has a class as a value, and the target is binary: whether this candidate
-is a true class which should be predicted. Then for each
-top-3 class, we add an extra binary feature which tells whether this class is
+with other bboxes was added. Then for each of all classes in top-3 predictions,
+and for a ``seg_fp`` class, we created one row with an extra feature ``candidate``,
+which had a class as a value, and the target is binary: whether this candidate
+class was a true class which should be predicted. Then for each
+top-3 class, we added an extra binary feature which tells whether this class is
 a candidate class.
 
 Here is a simplified example with 1 model and top-2 predictions,
@@ -221,7 +222,7 @@ all rows created for one character prediction (``seg_fp`` was encoded as -1)::
     83        258       15.2025     7.1246      0.0          258        False      True       False
     83        258       15.2025     7.1246      0.0          -1         False      False      False
 
-XGBoost and LighGBM models are trained across all folds, and then blended.
+XGBoost and LighGBM models were trained across all folds, and then blended.
 It was better to first apply models to fold predictions on test and then
 blend them.
 
@@ -231,8 +232,8 @@ I'm extremely bad at tuning such models, so there may be more improvements
 possible. Adjusting ``seg_fp`` ratio was tried and provided some boost on
 validation but didn't work on public LB.
 
-See kuzushiji.classify.level2_features where main features are created,
-and kuzushiji.classify.level2 where model are trained.
+See ``kuzushiji.classify.level2_features`` where main features are created,
+and ``kuzushiji.classify.level2`` where model are trained.
 
 Discarded ideas
 ---------------
