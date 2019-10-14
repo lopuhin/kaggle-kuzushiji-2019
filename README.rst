@@ -3,6 +3,8 @@ Kuzushiji Recognition
 
 https://www.kaggle.com/c/kuzushiji-recognition/
 
+.. contents::
+
 Install
 -------
 
@@ -37,3 +39,10 @@ All run logs and configs (for classification models) are in ``_runs`` folder.
 
 Overview
 --------
+
+License
+-------
+
+License is MIT.
+Files under ``detection`` are taken from torchvision with minor modifications,
+which is licensed under BSD-3-Clause.
