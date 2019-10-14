@@ -6,6 +6,7 @@ import re
 import lightgbm as lgb
 import pandas as pd
 import numpy as np
+from sklearn.ensemble import ExtraTreesClassifier
 import xgboost as xgb
 
 from ..data_utils import SEG_FP, get_encoded_classes
@@ -22,6 +23,7 @@ def main():
         help='detailed dataframes and the features in the same order')
     arg('--use-xgb', type=int, default=1)
     arg('--use-lgb', type=int, default=1)
+    arg('--use-et', type=int, default=1)
     arg('--num-boost-round', type=int, default=400)
     arg('--lr', type=float, default=0.05, help='for lightgbm')
     arg('--eta', type=float, default=0.15, help='for xgboost')
@@ -86,12 +88,18 @@ def main():
                              if args.use_lgb else None)
             xgb_load_path = (fold_path(args.load_model, 'xgb')
                              if args.use_xgb else None)
-            print(f'loading from {lgb_load_path}, {xgb_load_path}')
+            et_load_path = (fold_path(args.load_model, 'et')
+                            if args.use_et else None)
+            print(f'loading from '
+                  f'{lgb_load_path}, {xgb_load_path}, {et_load_path}')
             if lgb_load_path:
                 lgb_model = lgb.Booster(model_file=lgb_load_path)
             if xgb_load_path:
                 with open(xgb_load_path, 'rb') as f:
                     xgb_model = pickle.load(f)
+            if et_load_path:
+                with open(et_load_path, 'rb') as f:
+                    et_model = pickle.load(f)
         else:
             train_df = pd.concat([df for i, df in enumerate(feature_dfs)
                                   if i != fold_num])
@@ -108,18 +116,29 @@ def main():
                     valid_features, valid_df['y'],
                     eta=args.eta,
                     num_boost_round=args.num_boost_round)
+            if args.use_et:
+                et_model = train_et(
+                    train_features, train_df['y'],
+                    valid_features, valid_df['y'],
+                )
         if args.save_model:
             lgb_save_path = (fold_path(args.save_model, 'lgb')
                              if args.use_lgb else None)
             xgb_save_path = (fold_path(args.save_model, 'xgb')
                              if args.use_xgb else None)
-            print(f'saving to {lgb_save_path}, {xgb_save_path}')
+            et_save_path = (fold_path(args.save_model, 'et')
+                            if args.use_et else None)
+            print(f'saving to '
+                  f'{lgb_save_path}, {xgb_save_path}, {et_save_path}')
             if lgb_save_path:
                 lgb_model.save_model(
                     lgb_save_path, num_iteration=lgb_model.best_iteration)
             if xgb_save_path:
                 with open(xgb_save_path, 'wb') as f:
                     pickle.dump(xgb_model, f)
+            if et_save_path:
+                with open(et_save_path, 'wb') as f:
+                    pickle.dump(et_model, f)
 
         print('prediction')
         predictions = []
@@ -129,6 +148,8 @@ def main():
         if args.use_xgb:
             predictions.append(xgb_model.predict(
                 xgb_valid_data, ntree_limit=xgb_model.best_ntree_limit))
+        if args.use_et:
+            predictions.append(et_model.predict(valid_features.values))
         valid_df['y_pred'] = np.mean(predictions, axis=0)
         if args.seg_fp_adjust:
             valid_df.loc[valid_df['candidate_cls'] == -1, 'y_pred'] += \
@@ -209,6 +230,12 @@ def train_xgb(train_features, train_y, valid_features, valid_y, *,
         early_stopping_rounds=20,
         verbose_eval=10,
     )
+
+
+def train_et(train_features, train_y, valid_features, valid_y):
+    model = ExtraTreesClassifier(n_estimators=100, verbose=2, n_jobs=8)
+    model.fit(train_features.values, train_y)
+    return model
 
 
 def get_max_by_item(df):
