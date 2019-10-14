@@ -26,7 +26,7 @@ class Model(nn.Module):
                          self.base.out_features_l2 * self.res_l2 ** 2),
             n_classes=n_classes,
             dropout=head_dropout)
-        if self.use_sequences:
+        if self.use_sequences:  # unused
             self.lstm = nn.LSTM(
                 input_size=self.head.hidden_dim,
                 hidden_size=self.head.hidden_dim // 2,
@@ -54,12 +54,12 @@ class Model(nn.Module):
              x_l2.flatten(start_dim=1)],
             dim=1)
         x, x_features = self.head(x)
-        if self.use_sequences:
+        if self.use_sequences:  # unused
             x_features = self._apply_lstm(x_features, rois, sequences)
             x = self.head.apply_fc_out(x_features)
         return x, x_features, rois
 
-    def _apply_lstm(self, x, rois, sequences):
+    def _apply_lstm(self, x, rois, sequences):  # unused
         assert len(rois) == len(sequences)
         assert x.shape[0] == sum(map(len, rois))
         offset = 0
@@ -103,7 +103,7 @@ class Head(nn.Module):
         return self.fc2(x)
 
 
-class Head2(nn.Module):
+class Head2(nn.Module):  # unused
     def __init__(self, in_features: int, n_classes: int, dropout: float):
         super().__init__()
         self.hidden_dim = 1024
@@ -132,7 +132,7 @@ class Head2(nn.Module):
         return self.fc3(x)
 
 
-class Head3(nn.Module):
+class Head3(nn.Module):  # unused
     def __init__(self, in_features: int, n_classes: int, dropout: float):
         super().__init__()
         self.dropout = nn.Dropout(dropout) if dropout else None

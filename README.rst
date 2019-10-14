@@ -40,7 +40,209 @@ All run logs and configs (for classification models) are in ``_runs`` folder.
 Overview
 --------
 
-TODO
+General approach is as follows:
+
+- Split dataset into 5 folds by book.
+- Predict class-agnostic bounding boxes for all characters using an object
+  detection network (with resnet152 backbone pretrained on ImageNet).
+  Obtain out-of-fold predictions from all 5 folds.
+  This is done in ``kuzushiji.segment`` module.
+- Train a "classification" model on OOF predictions. An extra class "seg_fp"
+  (segmentation false-positive) class is added for bounding boxes which
+  have low overlap with ground truth boxes, so classification model can
+  correct errors of segmentation model.
+  Train classification model on all folds.
+  This is done in ``kuzushiji.classify`` module
+  (knn, blend and language modellnig are not used).
+  Models with resnet152 and resnext101_32x8d_wsl backbones are used,
+  they are trained on large crops containing multiple symbols,
+  using FPN and roi align with a classification head.
+- Perform pseudolabelling: in OCR terms this is similar to "writer adaptation",
+  although here we adapt to the whole test for simplicity.
+- Train a second level model on classification predictions,
+  use this for submission.
+
+Why such approach was chosen? There are two other candidate approaches:
+
+- Train end-to-end model which does detection and classification
+  (e.g. Mask-RCNN). This may be possible with some effort, but here it seems
+  that segmentation is quite easy, while classification is hard, and it's
+  more convenient to tune a classification model alone without worrying
+  about detection, also pipeline ie easier.
+- Train a separate detection model, and then train a classifier on character
+  crops. This is probably the easiest approach to get a reasonable result,
+  and makes it very easy to improve a classification model.
+  Still I felt that using larger crops as inputs should provide better context
+  for the model, so that it can see nearby symbols. But it could be that
+  classification on character crops can be better.
+
+Next come more details on each stage.
+
+Segmentation
+------------
+
+Segmentation into characters is done with a Fast-RCNN model with resnet152
+backbone trained with torchvision. Only one class is used, so it does not
+try to predict the character class. This model trains very fast and gives
+quite high quality boxes. Competition F1 metric (assuming
+perfect prediction for the class), was around ~0.99 F1.
+
+Some details:
+
+* torchvision detection pipeline was adapted,
+* resnet152 backbone worked a bit better than default resnet50 (even though
+  it was not pre-trained on COCO, doing this would offer another small boost),
+* pipeline was modified to accept empty crops (crops without ground truth
+  objects) to reduce amount of false positives,
+* it was trained on 512x384 crops, with page height around 1500 px
+* augmentations used: scale, minor color augmentations
+  (hue/saturation/value), albumentations library was used.
+
+Overall many more improvements are possible here: using mmdetection,
+better models, pre-trained on COCO, blending predictions from different folds
+for submission, separate model to discard out-of-page symbols, etc.
+Still it seems that classification is more important.
+
+See kuzushiji.segment, which is based on torchvision detection reference,
+and kuzushiji.segment.dataset for the dataset.
+
+Classification
+--------------
+
+Classification is performed by a model which gets as input a large crop
+from the image (512x768 from 2500-3000px high image) which contains multiple
+characters. It also recieves as input boudning boxes predicted by segmentation
+model (these are out-of-fold predictions). This is similar to multi-class
+detection, but with frozen bounding boxes.
+ResNet base is used, layer4 is discarded, features are extracted for each
+bounding box with roi_align from layer2 and layer3 and concatenated,
+and then passed into a classification head.
+
+Some details:
+
+* surpisingly, details such as architecture, backbone and learning regime
+  made a lot of difference, much more than usual
+* head with two fully-connected layers and two 0.5 dropout layers were
+  quite important: features from roi pooling were very high-dimentional
+  (more than 13k), first layer reduced this to 1024, and second layer
+  performed final classification. Addng more layers or removing intermediate
+  bottleneck reduced quality.
+* bigger backbones made a big difference, best model was the largest
+  that could fit into 2080ti with a reasonable batch size:
+  resnext101_32x8d_wsl from https://github.com/facebookresearch/WSL-Images
+* in order to train resnext101_32x8d_wsl on 2080ti, mixed precision training
+  was required along with freezing first convolution and whole layer1
+  (as I learned from Arthur Kuzin, this is a trick used in mmdetection:
+  https://github.com/open-mmlab/mmdetection/blob/6668bf0368b7ec6e88bc01aebdc281d2f79ef0cb/mmdet/models/backbones/resnet.py#L460)
+* another trick for reducing memory usage and making it train faster with
+  cudnn.benchmark was limiting and bucketing number of targets in one batch.
+* model was very sensitive to hyperparameters such as crop size and shape
+  and batch size (and gradient accumulation wasn't enough to fix this).
+* SGD with momentum performed significantly better than Adam, cosine schedule
+  was used, weight decay was also quite important.
+* quite large scale and color augmentations were used: hue/saturation/value,
+  random brighness, contrast and gamma, all from albumentations library.
+* TTA (test-time-augmentation) of 4 different scales was used.
+
+Best single model without pseudolabelling obtained public LB score of 0.935,
+although score varied quite a lot between folds,
+most folds were in 0.925 - 0.930 range.
+A blend of resnet152 and resnext101_32x8d_wsl models across all folds
+scored 0.941 on the public LB.
+
+Overall, many improvement are possible here, from just using bigger models
+and freezing less layers, to more work on training schedule, augmentations,
+etc.
+
+See kuzushiji.classify.main for the training script,
+kuzushiji.classify.models for the models,
+and kuzushiji.classify.dataset for the dataset and augmentations.
+
+Pseudolabelling
+---------------
+
+Pseudolabelling is a technique where we take confident predictions of our model
+on test data, and add this to train. Even though the model is already confident
+in such predictions, they are still useful and improve quality, because
+they allow the model to adapt better to different domain, as each book
+has it's own character and paper style, each author has different writing,
+etc.
+
+Here the simplest approach was chosen: most confident predictions were used
+for all test, instead of splitting it by book. Top 80% most confident
+predictions from the blend were used, having accuracy >99% according to
+validation. Next, two kinds of models were trained
+(all based on resnext101_32x8d_wsl):
+
+- fine-tuned classification models for 5 epochs
+  (compared to 50 epochs for training from scratch) with starting learning
+  rate 10x smaller than initial.
+- models trained from scratch with default settings.
+
+In both cases, models used both train and test data for training.
+Best fine-tuned model scored 0.938 on the public LB.
+From-scratch models were not submitted separately but from their contribution
+to the ensemble they looked even better.
+
+See kuzushiji.classify.pseudolabel for creation of test targets.
+
+Second level model
+------------------
+
+A simple blend worked already quite well, giving 0.943 public LB
+(without pseudolabelled from-scratch models). Adjusting coefficients of the
+models didn't improve the validation score, even though resnext101_32x8d_wsl
+models were noticeably better.
+
+Since all models were trained across all folds, it was possible to train
+a second level model, a blend of lightgmb and xgboost.
+This model was inspired by Pavel Ostyakov's solution to
+Cdiscount’s Image Classification Challenge, which was a classification
+problem with 5k classes:
+https://www.kaggle.com/c/cdiscount-image-classification-challenge/discussion/45733
+
+For each of 4 models kinds from classification contributes
+classes and scores of top-3 predictions as features. Also max overlap
+with other bboxes is added. Then for each of all classes in top-3 predictions,
+and for a seg_fp class, we create one row with an extra feature "candidate",
+which has a class as a value, and the target is binary - whether this candidate
+is a true class which should be predicted. Then for each
+top-3 class, we add a binary feature which tells whether this class is
+a candidate class.
+
+Here is a simplified example with 1 model and top-2 predictions,
+for one character (seg_fp was encoded as -1)::
+
+    top0_cls  top1_cls  top0_score  top1_score  box_overlap  candidate  top0_is_c  top1_is_c  y
+    83        258       15.2025     7.1246      0.0          83         True       False      True
+    83        258       15.2025     7.1246      0.0          258        False      True       False
+    83        258       15.2025     7.1246      0.0          -1         False      False      False
+
+XGBoost and LighGBM models are trained across all folds, and then blended
+(it's better to first apply models to fold predictions on test and then
+blend them).
+
+Such blend gives 0.949 on public LB.
+
+I'm extremely bad at tuning such models, so there may be more improvements
+possible. Adjusting seg_fp ratio was tried and provided some boost on
+validation but didn't work on public LB.
+
+See kuzushiji.classify.level2_features where main features are created,
+and kuzushiji.classify.level2 where model are trained.
+
+Discarded ideas
+---------------
+
+* language model: a simple bi-LSTM language model was trained, but it achieved
+  log loss of only ~4.5, while image-base model was at ~0.5, so it seemed
+  that it would provide very little benefit.
+* kNN: it's possible to use activations before the last layer as features,
+  extract them from train and test, and then at inference time look
+  closest (by cosine distance) example from train. This gave a minor boost
+  over classification for single models,
+  but inference time was quite high even with all optimizations,
+  blending was less clear, so this was discarded.
 
 License
 -------

@@ -80,7 +80,7 @@ def main():
     arg('--submission', help='Create submission', action='store_true')
     arg('--detailed-postfix', default='', help='postfix of detailed file name')
     arg('--print-model', default=1, type=int)
-    arg('--dump-features', default=0, type=int)
+    arg('--dump-features', default=0, type=int)  # for knn, unused
     args = parser.parse_args()
     if args.test_only and args.submission:
         parser.error('pass one of --test-only and --submission')
@@ -160,7 +160,7 @@ def main():
         )
 
     data_loader_test = make_test_data_loader(df_valid)
-    if args.dump_features:
+    if args.dump_features:  # unused
         df_train = df_train[df_train['labels'] != '']
         data_loader_train = make_test_data_loader(df_train)
     else:
@@ -232,7 +232,7 @@ def main():
         if args.benchmark:
             torch.backends.cudnn.benchmark = True
 
-    if args.dump_features and not args.submission:
+    if args.dump_features and not args.submission:  # unused
         if not output_dir:
             parser.error('set --output-dir with --dump-features')
         # We also dump test features below
