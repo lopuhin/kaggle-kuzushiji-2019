@@ -1,5 +1,5 @@
 import argparse
-from collections import defaultdict, Counter
+from collections import defaultdict
 from pathlib import Path
 
 import pandas as pd
@@ -26,51 +26,31 @@ def main():
     cls_by_idx = {idx: cls for cls, idx in classes.items()}
     classes[SEG_FP] = -1  # should create better splits
 
-    blended = []
-    for items in tqdm.tqdm(zip(*[df.itertuples() for df in dfs]),
-                           total=len(dfs[0]), desc='blending'):
-        preds = [get_pred_dict(item, cls_by_idx) for item in items]
-        blended.append((
-            items[0],
-            {cls: sum(p.get(cls, 0) for p in preds) / len(preds)
-             for cls in {cls for p in preds for cls in p}}
-        ))
-
-    counts = Counter()
-    counts_by_image_id = defaultdict(Counter)
-    for item, blend in blended:
-        top_pred = max(blend.items(), key=lambda cs: cs[1])[0]
-        counts[top_pred] += 1
-        counts_by_image_id[item.image_id][top_pred] += 1
     boxes_by_image_id = get_boxes_by_image_id(dfs[0])
-
     output = []
-    for i, (item, blend) in tqdm.tqdm(enumerate(blended),
-                                      total=len(blended), desc='features'):
-        true = item.true
-        top_k = sorted(
-            blend.items(), key=lambda cs: cs[1], reverse=True)[:args.top_k]
+    for i, items in tqdm.tqdm(enumerate(zip(*[df.itertuples() for df in dfs])),
+                              total=len(dfs[0])):
         features = {'item': i}
-        features.update({
-            f'top_{i}_cls': classes[cls] for i, (cls, _) in enumerate(top_k)})
-        features.update({
-            f'top_{i}_score': score for i, (_, score) in enumerate(top_k)})
+        top_k_classes = set()
+        for j, item in enumerate(items):
+            preds = get_pred_dict(item, cls_by_idx)
+            top_k = sorted(
+                preds.items(), key=lambda cs: cs[1], reverse=True)[:args.top_k]
+            top_k_classes.update(cls for cls, _ in top_k)
+            features.update({f'top_{i}_cls_m{j}': classes[cls]
+                             for i, (cls, _) in enumerate(top_k)})
+            features.update({f'top_{i}_score_m{j}': score
+                             for i, (_, score) in enumerate(top_k)})
+        item = items[0]
         features['box_overlap'] = get_max_iou(
             item, boxes_by_image_id[item.image_id])
-        features['width'] = item.w
-        features['height'] = item.h
-        features['aspect'] = item.w / max(item.h, 1)
-        if not any(true == cls for cls, _ in top_k):
+        true = item.true
+        if not any(true == cls for cls in top_k_classes):
             true = SEG_FP  # it harms F1 less: one fn instead of fn + fp
-        for cls in ({cls for cls, _ in top_k} | {true, SEG_FP}):
+        for cls in (top_k_classes | {true, SEG_FP}):
             output.append(dict(
                 features,
-                candidate_cls=classes[cls], 
-                candidate_count=counts[cls],
-                candidate_count_on_page=counts_by_image_id[item.image_id][cls],
-                candidate_freq_on_page=(
-                    counts_by_image_id[item.image_id][cls] /
-                    sum(counts_by_image_id[item.image_id].values())),
+                candidate_cls=classes[cls],
                 y=true == cls))
     print(f'{len(output):,} items')
     pd.DataFrame(output).to_csv(args.output, index=None)

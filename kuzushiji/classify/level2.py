@@ -55,7 +55,7 @@ def main():
             'candidate_count', 'candidate_count_on_page',
             'candidate_freq_on_page',
         }]
-    top_cls_re = re.compile('^top_\d+_cls$')
+    top_cls_re = re.compile('^top_\d+_cls')
 
     def build_features(df):
         df = df[feature_cols].copy()
