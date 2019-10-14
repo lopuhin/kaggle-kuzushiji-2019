@@ -3,5 +3,5 @@ https://github.com/pytorch/vision/tree/master/torchvision/models/detection
 
 Summary of changes:
 
- - support training when no ground truth boxes are present
- - resnet101 and resnet152 backbones added to detection
+- support training when no ground truth boxes are present
+- resnet101 and resnet152 backbones added to detection
