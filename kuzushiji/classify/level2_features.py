@@ -1,5 +1,6 @@
 import argparse
 from collections import defaultdict
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -13,27 +14,42 @@ from .blend import get_pred_dict
 def main():
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
-    arg('detailed', nargs='+',
-        help='predictions on test in "detailed_*" format')
+    arg('detailed',
+        help='json with groups of predictions on test in "detailed_*" format, '
+             'each group is blended (see source and level2.sh)')
     arg('output', help='output path for kuzushiji.classify.level2')
     arg('--top-k', type=int, default=3)
     args = parser.parse_args()
     if Path(args.output).exists():
         parser.error(f'output {args.output} exists')
 
-    dfs = [pd.read_csv(path) for path in args.detailed]
+    dfs = [[pd.read_csv(path) for path in group]
+           for group in json.loads(args.detailed)]
     classes = dict(get_encoded_classes())
     cls_by_idx = {idx: cls for cls, idx in classes.items()}
     classes[SEG_FP] = -1  # should create better splits
 
-    boxes_by_image_id = get_boxes_by_image_id(dfs[0])
+    df = dfs[0][0]
+    boxes_by_image_id = get_boxes_by_image_id(df)
+    blended_groups = []
+    for i, group in enumerate(dfs):
+        blended = []
+        blended_groups.append(blended)
+        for items in tqdm.tqdm(zip(*[df.itertuples() for df in group]),
+                               total=len(df), desc=f'blending {i}'):
+            preds = [get_pred_dict(item, cls_by_idx) for item in items]
+            blended.append((
+                items[0],
+                {cls: sum(p.get(cls, 0) for p in preds) / len(preds)
+                     for cls in {cls for p in preds for cls in p}}
+            ))
+
     output = []
-    for i, items in tqdm.tqdm(enumerate(zip(*[df.itertuples() for df in dfs])),
-                              total=len(dfs[0])):
+    for i, item_groups in tqdm.tqdm(enumerate(zip(*blended_groups)),
+                                    total=len(df)):
         features = {'item': i}
         top_k_classes = set()
-        for j, item in enumerate(items):
-            preds = get_pred_dict(item, cls_by_idx)
+        for j, (_, preds) in enumerate(item_groups):
             top_k = sorted(
                 preds.items(), key=lambda cs: cs[1], reverse=True)[:args.top_k]
             top_k_classes.update(cls for cls, _ in top_k)
@@ -41,7 +57,7 @@ def main():
                              for i, (cls, _) in enumerate(top_k)})
             features.update({f'top_{i}_score_m{j}': score
                              for i, (_, score) in enumerate(top_k)})
-        item = items[0]
+        item = item_groups[0][0]
         features['box_overlap'] = get_max_iou(
             item, boxes_by_image_id[item.image_id])
         true = item.true
