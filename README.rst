@@ -26,7 +26,7 @@ Run
 All steps required for submission are in heavily commented ``run-all.sh``
 and ``level2.sh``. Note that ``run-all.sh`` was never run in one step
 (it would take too much time), so may contain errors.
-Also all model parameters are in the ``models`` folder
+Most model parameters are in the ``_runs`` folder
 (they come from actual models).
 
 One extra model was used to create pseudolabels which is not used in the final
