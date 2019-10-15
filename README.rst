@@ -122,10 +122,10 @@ and then passed into a classification head.
 
 Some details:
 
-* surpisingly, details such as architecture, backbone and learning regime
+* surprisingly, details such as architecture, backbone and learning regime
   made a lot of difference, much more than usual.
 * head with two fully-connected layers and two 0.5 dropout layers was used,
-  and all detailes were important:
+  and all details were important:
   features from roi pooling were very high-dimentional (more than 13k),
   first layer reduced this to 1024, and second layer
   performed final classification. Addng more layers or removing intermediate
@@ -215,12 +215,13 @@ top-3 class, we added an extra binary feature which tells whether this class is
 a candidate class.
 
 Here is a simplified example with 1 model and top-2 predictions,
-all rows created for one character prediction (``seg_fp`` was encoded as -1)::
+all rows created for one character prediction (``seg_fp`` was encoded as -1,
+``top0_s`` means ``top0_score``, ``top0_is_c`` means ``top0_is_candidate``)::
 
-    top0_cls  top1_cls  top0_score  top1_score  box_overlap  candidate  top0_is_c  top1_is_c  y
-    83        258       15.2025     7.1246      0.0          83         True       False      True
-    83        258       15.2025     7.1246      0.0          258        False      True       False
-    83        258       15.2025     7.1246      0.0          -1         False      False      False
+    top0_cls  top1_cls  top0_s  top1_s  candidate  top0_is_c  top1_is_c  y
+    83        258       15.202  7.1246  83         True       False      True
+    83        258       15.202  7.1246  258        False      True       False
+    83        258       15.202  7.1246  -1         False      False      False
 
 XGBoost and LighGBM models were trained across all folds, and then blended.
 It was better to first apply models to fold predictions on test and then
