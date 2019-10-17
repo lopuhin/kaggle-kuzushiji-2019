@@ -140,7 +140,7 @@ Some details:
 * another trick for reducing memory usage and making it train faster with
   cudnn.benchmark was limiting and bucketing number of targets in one batch.
 * model was very sensitive to hyperparameters such as crop size and shape
-  and batch size (and gradient accumulation wasn't enough to fix this).
+  and batch size (and I had a bug in gradient accumulation).
 * SGD with momentum performed significantly better than Adam, cosine schedule
   was used, weight decay was also quite important.
 * quite large scale and color augmentations were used: hue/saturation/value,

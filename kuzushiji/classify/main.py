@@ -542,9 +542,6 @@ def create_supervised_trainer(
     def update_fn(engine, batch):
         model.train()
 
-        if engine.state.iteration % accumulation_steps == 0:
-            optimizer.zero_grad()
-
         x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
         y_pred = model(x)
         loss = loss_fn(y_pred, y)
@@ -557,6 +554,7 @@ def create_supervised_trainer(
 
         if engine.state.iteration % accumulation_steps == 0:
             optimizer.step()
+            optimizer.zero_grad()
 
         return output_transform(x, y, y_pred, loss)
 
