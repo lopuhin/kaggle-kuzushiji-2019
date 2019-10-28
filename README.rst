@@ -40,6 +40,9 @@ All run logs and configs (for classification models) are in ``_runs`` folder.
 Overview
 ========
 
+Note: a slighly more complete description is at
+https://www.kaggle.com/c/kuzushiji-recognition/discussion/112712
+
 General approach is as follows:
 
 - Dataset is split into 5 folds by book.
